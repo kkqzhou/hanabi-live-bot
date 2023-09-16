@@ -342,7 +342,7 @@ def test_superposition3():
         STATES_5P[4].superpositions[18].get_sp_identities(),
         {(0, 1), (1, 1), (2, 1), (3, 1), (4, 1)},
     )
-    check_eq(STATES_5P[2].our_candidates[-2], {(1, 1), (2, 1), (3, 1), (4, 1)})
+    check_eq(STATES_5P[4].our_candidates[-2], {(0, 1), (1, 1), (2, 1), (3, 1), (4, 1)})
 
 
 def test_superposition4():
@@ -458,6 +458,35 @@ def test_superposition5():
     check_eq(STATES_5P[2].our_candidates[0], {(3, 1)})
 
 
+def test_superposition6():
+    # https://hanab.live/shared-replay/1025834
+    hand_strs = [
+        ["k1", "p4", "p3", "g5"],
+        ["g3", "k3", "y3", "k4"],
+        ["r3", "p1", "g4", "g2"],
+        ["k2", "p1", "p2", "g4"],
+        ["p3", "r4", "b1", "b1"],
+    ]
+    STATES_5P = construct_test_state("Black (6 Suits)", hand_strs)
+
+    give_clue(STATES_5P, 0, COLOR_CLUE, 5, 1)
+    give_clue(STATES_5P, 1, RANK_CLUE, 4, 0)
+    give_clue(STATES_5P, 2, RANK_CLUE, 4, 3)
+    give_clue(STATES_5P, 3, COLOR_CLUE, 4, 2)
+    play_draw(STATES_5P, 17, 20, 0, 1)  # t5
+    play_draw(STATES_5P, 3, 21, 1, 1)
+    give_clue(STATES_5P, 1, COLOR_CLUE, 0, 2)
+
+    check_eq(STATES_5P[4].superpositions[18].triggering_orders, {10, 14})
+    check_eq(STATES_5P[4].superpositions[18].actual_num_trash, 0)
+    check_eq(STATES_5P[4].our_candidates[1], {(0, 4), (3, 5)})
+    discard_draw(STATES_5P, 10, 22, 0, 1)
+
+    check_eq(STATES_5P[4].superpositions[18].triggering_orders, {14})
+    check_eq(STATES_5P[4].superpositions[18].actual_num_trash, 0)
+    check_eq(STATES_5P[4].our_candidates[1], {(0, 4), (3, 5)})
+
+
 def test_all():
     t0 = dt.datetime.now()
     test_evaluate_clue_score()
@@ -466,10 +495,11 @@ def test_all():
     test_superposition3()
     test_superposition4()
     test_superposition5()
+    test_superposition6()
     t1 = dt.datetime.now()
     print(f"All tests passed in {(t1 - t0).total_seconds():.2f}s!")
 
 
 if __name__ == "__main__":
     test_all()
-    # test_superposition5()
+    # test_superposition6()

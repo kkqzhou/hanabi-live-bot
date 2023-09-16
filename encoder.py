@@ -373,8 +373,17 @@ class EncoderGameState(GameState):
         order_to_index = self.order_to_index
         for sp_order, superposition in self.superpositions.items():
             _, i = order_to_index[sp_order]
+            other_hc_orders_w_discarded_identity = {
+                card.order
+                for i in range(self.num_players)
+                for card in self.hands[i]
+                if (i != self.our_player_index)
+                and card.to_tuple() == (suit_index, rank)
+                and card.order in self.hat_clued_card_orders
+            }
             if order in superposition.triggering_orders:
-                superposition.actual_num_trash += 1
+                if len(other_hc_orders_w_discarded_identity) == 1:
+                    superposition.actual_num_trash += 1
                 superposition.triggering_orders.remove(order)
                 new_candidates = superposition.get_sp_identities()
                 self.our_candidates[i] = self.our_possibilities[i].intersection(
