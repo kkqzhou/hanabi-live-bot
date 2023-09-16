@@ -13,6 +13,7 @@ from game_state import (
 )
 
 from typing import Dict, List, Set, Optional, Tuple
+from copy import deepcopy
 
 
 def get_playful_mod_table(variant_name: str, preferred_modulus=None):
@@ -651,6 +652,7 @@ class EncoderGameState(GameState):
         num_residues = self.num_residues_per_player
 
         identity_to_residue = self.identity_to_residue
+        local_identities_called_to_play = deepcopy(self.identities_called_to_play)
         for player_index, hand in self.hands.items():
             if player_index == self.our_player_index:
                 continue
@@ -660,13 +662,13 @@ class EncoderGameState(GameState):
 
             identity = lnhc.to_tuple()
             if self.is_playable_card(lnhc):
-                if identity in self.identities_called_to_play and (
+                if identity in local_identities_called_to_play and (
                     self.score_pct < self.dupe_play_score_pct_threshold
                 ):
                     sum_of_residues += 0
                 else:
                     sum_of_residues += identity_to_residue[identity]
-                    self.identities_called_to_play.add(identity)
+                    local_identities_called_to_play.add(identity)
             else:
                 sum_of_residues += identity_to_residue[identity]
 

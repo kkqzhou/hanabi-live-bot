@@ -705,11 +705,11 @@ class HanabiClient:
                 return
 
             # priority 4
-            absolute_playables = {
+            absolute_playables = [
                 order
                 for order in sorted_playables
                 if state.is_playable(state.get_candidates(order))
-            }
+            ]
             if len(absolute_playables):
                 print("PRIO 4")
                 self.play(absolute_playables[0], table_id)
