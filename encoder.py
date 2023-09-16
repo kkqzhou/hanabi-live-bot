@@ -161,11 +161,11 @@ class SuperPosition:
         self.default_residue = default_residue
         self.increment = increment_candidates
         self.triggering_orders = triggering_orders
-        self.actual_num_trash = 0
+        self.unexpected_trash = 0
 
     @property
     def residue_increment(self) -> int:
-        return self.actual_num_trash
+        return self.unexpected_trash
 
     def get_updated_residue(self, mod_base: int) -> int:
         return (self.default_residue + self.residue_increment) % mod_base
@@ -176,7 +176,7 @@ class SuperPosition:
     def __str__(self):
         return (
             f"Residue: {self.default_residue}, Triggering: {self.triggering_orders}, "
-            f"Unexpected # trash: {self.actual_num_trash}\n"
+            f"Unexpected # trash: {self.unexpected_trash}\n"
             f"Superposition identities: {self.get_sp_identities()}"
         )
 
@@ -345,7 +345,7 @@ class EncoderGameState(GameState):
                 if (player_index == self.our_player_index) and (
                     order in self.hat_clued_card_orders
                 ):
-                    superposition.actual_num_trash += 1
+                    superposition.unexpected_trash += 1
                 else:
                     print("A player with known duped card played it")
                 superposition.triggering_orders.remove(trash_order)
@@ -383,7 +383,7 @@ class EncoderGameState(GameState):
             }
             if order in superposition.triggering_orders:
                 if len(other_hc_orders_w_discarded_identity) == 1:
-                    superposition.actual_num_trash += 1
+                    superposition.unexpected_trash += 1
                 superposition.triggering_orders.remove(order)
                 new_candidates = superposition.get_sp_identities()
                 self.our_candidates[i] = self.our_possibilities[i].intersection(

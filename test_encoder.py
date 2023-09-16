@@ -188,19 +188,19 @@ def test_superposition():
         check_eq(STATES_5P[i].identities_called_to_play, {(0, 1)})
 
     check_eq(STATES_5P[1].superpositions[7].triggering_orders, {15, 19})
-    check_eq(STATES_5P[1].superpositions[7].actual_num_trash, 0)
+    check_eq(STATES_5P[1].superpositions[7].unexpected_trash, 0)
     check_eq(STATES_5P[1].superpositions[7].get_sp_identities(), {(0, 3)})
     check_eq(STATES_5P[2].superpositions[11].triggering_orders, {15, 19})
-    check_eq(STATES_5P[2].superpositions[11].actual_num_trash, 0)
+    check_eq(STATES_5P[2].superpositions[11].unexpected_trash, 0)
     check_eq(
         STATES_5P[2].superpositions[11].get_sp_identities(), {(0, 4), (2, 5), (4, 4)}
     )
     check_eq(STATES_5P[3].superpositions[15].triggering_orders, {19})
-    check_eq(STATES_5P[3].superpositions[15].actual_num_trash, 0)
+    check_eq(STATES_5P[3].superpositions[15].unexpected_trash, 0)
     check_eq(STATES_5P[3].superpositions[15].get_sp_identities(), {(0, 1)})
     check_eq(STATES_5P[3].our_candidates[-1], {(0, 1)})
     check_eq(STATES_5P[4].superpositions[19].triggering_orders, {15})
-    check_eq(STATES_5P[4].superpositions[19].actual_num_trash, 0)
+    check_eq(STATES_5P[4].superpositions[19].unexpected_trash, 0)
     check_eq(STATES_5P[4].superpositions[19].get_sp_identities(), {(0, 1)})
     check_eq(STATES_5P[4].our_candidates[-1], {(0, 1)})
 
@@ -210,38 +210,38 @@ def test_superposition():
         check_eq(STATES_5P[i].identities_called_to_play, {(0, 1), (1, 1), (2, 1)})
 
     check_eq(STATES_5P[0].superpositions[3].triggering_orders, {14, 18})
-    check_eq(STATES_5P[0].superpositions[3].actual_num_trash, 0)
+    check_eq(STATES_5P[0].superpositions[3].unexpected_trash, 0)
     check_eq(STATES_5P[0].superpositions[3].get_sp_identities(), {(0, 2)})
     check_eq(STATES_5P[0].superpositions[2].triggering_orders, {13, 17})
-    check_eq(STATES_5P[0].superpositions[2].actual_num_trash, 0)
+    check_eq(STATES_5P[0].superpositions[2].unexpected_trash, 0)
     check_eq(STATES_5P[0].superpositions[2].get_sp_identities(), {(1, 2)})
     check_eq(STATES_5P[1].superpositions[6].triggering_orders, {13, 17})
-    check_eq(STATES_5P[1].superpositions[6].actual_num_trash, 0)
+    check_eq(STATES_5P[1].superpositions[6].unexpected_trash, 0)
     check_eq(STATES_5P[1].superpositions[6].get_sp_identities(), {(1, 3)})
     check_eq(STATES_5P[2].superpositions[10].triggering_orders, {14, 18})
-    check_eq(STATES_5P[2].superpositions[10].actual_num_trash, 0)
+    check_eq(STATES_5P[2].superpositions[10].unexpected_trash, 0)
     check_eq(STATES_5P[2].superpositions[10].get_sp_identities(), {(1, 4), (3, 5)})
     check_eq(STATES_5P[3].superpositions[14].triggering_orders, {18})
-    check_eq(STATES_5P[3].superpositions[14].actual_num_trash, 0)
+    check_eq(STATES_5P[3].superpositions[14].unexpected_trash, 0)
     check_eq(
         STATES_5P[3].superpositions[14].get_sp_identities(),
         {(0, 1), (1, 1), (2, 1), (3, 1), (4, 1)},
     )
 
     check_eq(STATES_5P[3].superpositions[13].triggering_orders, {17})
-    check_eq(STATES_5P[3].superpositions[13].actual_num_trash, 0)
+    check_eq(STATES_5P[3].superpositions[13].unexpected_trash, 0)
     check_eq(
         STATES_5P[3].superpositions[13].get_sp_identities(), {(3, 4), (0, 5), (1, 5)}
     )
 
     check_eq(STATES_5P[4].superpositions[18].triggering_orders, {14})
-    check_eq(STATES_5P[4].superpositions[18].actual_num_trash, 0)
+    check_eq(STATES_5P[4].superpositions[18].unexpected_trash, 0)
     check_eq(
         STATES_5P[4].superpositions[18].get_sp_identities(),
         {(0, 1), (1, 1), (2, 1), (3, 1), (4, 1)},
     )
     check_eq(STATES_5P[4].superpositions[17].triggering_orders, {13})
-    check_eq(STATES_5P[4].superpositions[17].actual_num_trash, 0)
+    check_eq(STATES_5P[4].superpositions[17].unexpected_trash, 0)
     check_eq(
         STATES_5P[4].superpositions[17].get_sp_identities(), {(3, 4), (0, 5), (1, 5)}
     )
@@ -251,7 +251,7 @@ def test_superposition():
         check_eq(STATES_5P[i].identities_called_to_play, {(0, 1), (1, 1), (2, 1)})
 
     check_eq(STATES_5P[4].superpositions[19].triggering_orders, set())
-    check_eq(STATES_5P[4].superpositions[19].actual_num_trash, 1)
+    check_eq(STATES_5P[4].superpositions[19].unexpected_trash, 1)
     check_eq(
         STATES_5P[4].superpositions[19].get_sp_identities(),
         {(0, 1), (1, 1), (2, 1), (3, 1), (4, 1)},
@@ -263,7 +263,7 @@ def test_superposition():
         check_eq(STATES_5P[i].identities_called_to_play, {(0, 1), (2, 1)})
 
     check_eq(STATES_5P[3].superpositions[13].triggering_orders, set())
-    check_eq(STATES_5P[3].superpositions[13].actual_num_trash, 1)
+    check_eq(STATES_5P[3].superpositions[13].unexpected_trash, 1)
     check_eq(
         STATES_5P[3].superpositions[13].get_sp_identities(),
         {(0, 1), (1, 1), (2, 1)},
@@ -275,7 +275,7 @@ def test_superposition():
         check_eq(STATES_5P[i].identities_called_to_play, {(0, 1)})
 
     check_eq(STATES_5P[4].superpositions[17].triggering_orders, set())
-    check_eq(STATES_5P[4].superpositions[17].actual_num_trash, 1)
+    check_eq(STATES_5P[4].superpositions[17].unexpected_trash, 1)
     check_eq(
         STATES_5P[4].superpositions[17].get_sp_identities(),
         {(0, 1), (1, 1), (2, 1)},
@@ -301,7 +301,7 @@ def test_superposition2():
 
     # check
     check_eq(STATES_5P[2].superpositions[11].triggering_orders, {19})
-    check_eq(STATES_5P[2].superpositions[11].actual_num_trash, 0)
+    check_eq(STATES_5P[2].superpositions[11].unexpected_trash, 0)
     check_eq(
         STATES_5P[2].superpositions[11].get_sp_identities(),
         {(2, 2)},
@@ -310,7 +310,7 @@ def test_superposition2():
     play(STATES_5P, 17)
 
     check_eq(STATES_5P[2].superpositions[11].triggering_orders, set())
-    check_eq(STATES_5P[2].superpositions[11].actual_num_trash, 0)
+    check_eq(STATES_5P[2].superpositions[11].unexpected_trash, 0)
     check_eq(
         STATES_5P[2].superpositions[11].get_sp_identities(),
         {(2, 2)},
@@ -337,7 +337,7 @@ def test_superposition3():
     discard(STATES_5P, 14)
 
     check_eq(STATES_5P[4].superpositions[18].triggering_orders, set())
-    check_eq(STATES_5P[4].superpositions[18].actual_num_trash, 1)
+    check_eq(STATES_5P[4].superpositions[18].unexpected_trash, 1)
     check_eq(
         STATES_5P[4].superpositions[18].get_sp_identities(),
         {(0, 1), (1, 1), (2, 1), (3, 1), (4, 1)},
@@ -359,7 +359,7 @@ def test_superposition4():
     give_clue(STATES_5P, 0, RANK_CLUE, 1, 1)  # t1
 
     check_eq(STATES_5P[3].superpositions[15].triggering_orders, {11})
-    check_eq(STATES_5P[3].superpositions[15].actual_num_trash, 0)
+    check_eq(STATES_5P[3].superpositions[15].unexpected_trash, 0)
     check_eq(
         STATES_5P[3].superpositions[15].get_sp_identities(),
         {(0, 1), (1, 1), (2, 1), (3, 1), (4, 1)},
@@ -368,7 +368,7 @@ def test_superposition4():
 
     play_draw(STATES_5P, 6, 20, 4, 3)  # t2
     check_eq(STATES_5P[3].superpositions[15].triggering_orders, set())
-    check_eq(STATES_5P[3].superpositions[15].actual_num_trash, 0)
+    check_eq(STATES_5P[3].superpositions[15].unexpected_trash, 0)
     check_eq(
         STATES_5P[3].superpositions[15].get_sp_identities(),
         {(0, 1), (1, 1), (2, 1), (3, 1), (4, 1)},
@@ -377,7 +377,7 @@ def test_superposition4():
 
     discard(STATES_5P, 11)  # t3
     check_eq(STATES_5P[3].superpositions[15].triggering_orders, set())
-    check_eq(STATES_5P[3].superpositions[15].actual_num_trash, 0)
+    check_eq(STATES_5P[3].superpositions[15].unexpected_trash, 0)
     check_eq(
         STATES_5P[3].superpositions[15].get_sp_identities(),
         {(0, 1), (1, 1), (2, 1), (3, 1), (4, 1)},
@@ -448,13 +448,13 @@ def test_superposition5():
     play_draw(STATES_5P, 22, 25, 1, 4)
 
     check_eq(STATES_5P[0].superpositions[0].triggering_orders, {8})
-    check_eq(STATES_5P[0].superpositions[0].actual_num_trash, 0)
+    check_eq(STATES_5P[0].superpositions[0].unexpected_trash, 0)
     check_eq(STATES_5P[0].our_candidates[0], {(0, 5)})
     check_eq(STATES_5P[1].superpositions[4].triggering_orders, {8})
-    check_eq(STATES_5P[1].superpositions[4].actual_num_trash, 1)
+    check_eq(STATES_5P[1].superpositions[4].unexpected_trash, 1)
     check_eq(4 in STATES_5P[1].trashy_orders, True)
     check_eq(STATES_5P[2].superpositions[8].triggering_orders, set())
-    check_eq(STATES_5P[2].superpositions[8].actual_num_trash, 0)
+    check_eq(STATES_5P[2].superpositions[8].unexpected_trash, 0)
     check_eq(STATES_5P[2].our_candidates[0], {(3, 1)})
 
 
@@ -478,12 +478,12 @@ def test_superposition6():
     give_clue(STATES_5P, 1, COLOR_CLUE, 0, 2)
 
     check_eq(STATES_5P[4].superpositions[18].triggering_orders, {10, 14})
-    check_eq(STATES_5P[4].superpositions[18].actual_num_trash, 0)
+    check_eq(STATES_5P[4].superpositions[18].unexpected_trash, 0)
     check_eq(STATES_5P[4].our_candidates[1], {(0, 4), (3, 5)})
     discard_draw(STATES_5P, 10, 22, 0, 1)
 
     check_eq(STATES_5P[4].superpositions[18].triggering_orders, {14})
-    check_eq(STATES_5P[4].superpositions[18].actual_num_trash, 0)
+    check_eq(STATES_5P[4].superpositions[18].unexpected_trash, 0)
     check_eq(STATES_5P[4].our_candidates[1], {(0, 4), (3, 5)})
 
 
