@@ -341,8 +341,8 @@ class EncoderGameState(GameState):
                     removed_trash_orders.add(maybe_trash_order)
 
             for trash_order in removed_trash_orders:
-                player_holding_trash, _ = order_to_index[trash_order]
-                if (player_holding_trash != player_index) and (
+                # trash is only "unexpected" if we played it
+                if (player_index == self.our_player_index) and (
                     order in self.hat_clued_card_orders
                 ):
                     superposition.actual_num_trash += 1
@@ -407,6 +407,7 @@ class EncoderGameState(GameState):
         triggering_orders = set()
 
         sum_of_others_residues = 0
+        print(f"Identities called to play: {self.identities_called_to_play}")
         for player_index, hand in self.hands.items():
             if player_index in {self.our_player_index, clue_giver}:
                 continue
@@ -429,8 +430,8 @@ class EncoderGameState(GameState):
                 other_residue = identity_to_residue[identity]
 
             print(
-                self.player_names[player_index]
-                + f" {left_non_hat_clued} has residue {other_residue}"
+                f"{self.player_names[player_index]} {left_non_hat_clued} "
+                f"has residue {other_residue}."
             )
             sum_of_others_residues += other_residue
 

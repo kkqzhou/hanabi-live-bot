@@ -1,9 +1,9 @@
 from encoder import EncoderGameState
-from game_state import RANK_CLUE, COLOR_CLUE, get_all_touched_cards
+from game_state import RANK_CLUE, COLOR_CLUE, get_all_touched_cards, SUITS, Card
 from test_functions import check_eq
 from test_game_state import create_game_states, get_deck_from_tuples
 import datetime as dt
-from typing import Dict
+from typing import Dict, List
 
 
 def give_hat_clue(states: Dict[int, EncoderGameState], giver: int):
@@ -17,6 +17,7 @@ def give_hat_clue(states: Dict[int, EncoderGameState], giver: int):
     for _state in states.values():
         _state.handle_clue(giver, target_index, clue_type, clue_value, touched_orders)
         _state.turn += 1
+    return clue_value, clue_type, target_index
 
 
 def give_clue(
@@ -46,6 +47,7 @@ def discard(states: Dict[int, EncoderGameState], order: int):
             player_index, order, card_visible.suit_index, card_visible.rank
         )
         _state.turn += 1
+    return player_index
 
 
 def play(states: Dict[int, EncoderGameState], order: int):
@@ -58,6 +60,7 @@ def play(states: Dict[int, EncoderGameState], order: int):
             player_index, order, card_visible.suit_index, card_visible.rank
         )
         _state.turn += 1
+    return player_index
 
 
 def draw(
@@ -67,8 +70,81 @@ def draw(
     suit_index: int,
     rank: int,
 ):
-    for _state in states.values():
-        _state.handle_draw(player_index, order, suit_index, rank)
+    for p_index, state in states.items():
+        if p_index == player_index:
+            state.handle_draw(player_index, order, -1, -1)
+        else:
+            state.handle_draw(player_index, order, suit_index, rank)
+
+
+def play_draw(
+    states: Dict[int, EncoderGameState],
+    order: int,
+    draw_order: int,
+    draw_suit_index: int,
+    draw_rank: int,
+):
+    player_index = play(states, order)
+    draw(states, draw_order, player_index, draw_suit_index, draw_rank)
+
+
+def discard_draw(
+    states: Dict[int, EncoderGameState],
+    order: int,
+    draw_order: int,
+    draw_suit_index: int,
+    draw_rank: int,
+):
+    player_index = discard(states, order)
+    draw(states, draw_order, player_index, draw_suit_index, draw_rank)
+
+
+def construct_test_state(
+    variant_name: str, hand_strs: List[List[str]]
+) -> Dict[int, EncoderGameState]:
+    """
+    Accepts a list of lists as follows (as you would see in hanab.live):
+    [
+        [order_3, order_2, order_1, order_0],
+        [order_7, order_6, order_5, order_4],
+        ...
+    ]
+
+    where order_0 = {suit_str}{rank} and suit_str -> suit is defined in the function.
+    """
+    suit_str_to_suit = {
+        "Red": "r",
+        "Yellow": "y",
+        "Green": "g",
+        "Blue": "b",
+        "Purple": "p",
+        "Teal": "t",
+        "Black": "k",
+        "Prism": "i",
+        "Rainbow": "m",
+        "Pink": "i",
+        "Light Pink": "i",
+        "Brown": "n",
+        "Muddy Rainbow": "m",
+        "Omni": "o",
+        "Null": "u",
+    }
+    abbr_to_suit_index = {
+        suit_str_to_suit[suit]: suit_index
+        for suit_index, suit in enumerate(SUITS[variant_name])
+    }
+    deck = []
+    order = 0
+    for hand_str in hand_strs:
+        for card_str in reversed(hand_str):
+            suit_index = abbr_to_suit_index[card_str[0]]
+            rank = int(card_str[1])
+            deck.append(Card(order, suit_index, rank))
+            order += 1
+
+    return create_game_states(
+        len(hand_strs), variant_name, game_state_cls=EncoderGameState, deck=deck
+    )
 
 
 def test_evaluate_clue_score():
@@ -98,28 +174,15 @@ def test_evaluate_clue_score():
 
 
 def test_superposition():
-    variant_name = "Omni (5 Suits)"
-    # fmt: off
-    deck = get_deck_from_tuples(
-        [
-            (4, 2), (2, 2), (1, 2), (0, 2),
-            (4, 3), (2, 3), (1, 3), (0, 3),
-            (4, 4), (2, 4), (1, 4), (0, 4),
-            (4, 5), (2, 1), (1, 1), (0, 1),
-            (4, 1), (1, 1), (2, 1), (0, 1),
-        ]
-    )
-    # fmt: on
+    hand_strs = [
+        ["r2", "y2", "g2", "o2"],
+        ["r3", "y3", "g3", "o3"],
+        ["r4", "y4", "g4", "o4"],
+        ["r1", "y1", "g1", "o5"],
+        ["r1", "g1", "y1", "o1"],
+    ]
+    STATES_5P = construct_test_state("Omni (5 Suits)", hand_strs)
 
-    # p0: r2 [ 3], y2 [ 2], g2 [ 1], o2 [ 0]
-    # p1: r3 [ 7], y3 [ 6], g3 [ 5], o3 [ 4]
-    # p2: r4 [11], y4 [10], g4 [ 9], o4 [ 8]
-    # p3: r1 [15], y1 [14], g1 [13], o5 [12]
-    # p4: r1 [19], g1 [18], y1 [17], o1 [16]
-
-    STATES_5P: Dict[int, EncoderGameState] = create_game_states(
-        5, variant_name, game_state_cls=EncoderGameState, deck=deck
-    )
     give_hat_clue(STATES_5P, 0)
     for i in range(5):
         check_eq(STATES_5P[i].identities_called_to_play, {(0, 1)})
@@ -222,32 +285,17 @@ def test_superposition():
 
 def test_superposition2():
     # https://hanab.live/replay/1024839
-    variant_name = "No Variant"
-    # fmt: off
-    deck = get_deck_from_tuples(
-        [
-            (3, 2), (0, 3), (4, 5), (3, 1),
-            (4, 3), (4, 4), (1, 5), (1, 1),
-            (0, 4), (2, 5), (4, 1), (2, 2),
-            (4, 4), (2, 3), (4, 2), (3, 3),
-            (2, 4), (2, 1), (2, 1), (2, 1),
-        ]
-    )
-    # fmt: on
-
-    # p0: b1 [ 3], p5 [ 2], r3 [ 1], b2 [ 0]
-    # p1: y1 [ 7], y5 [ 6], p4 [ 5], p3 [ 4]
-    # p2: g2 [11], p1 [10], g5 [ 9], r4 [ 8]
-    # p3: b3 [15], p2 [14], y3 [13], p4 [12]
-    # p4: g1 [19], g1 [18], g1 [17], g4 [16]
-
-    STATES_5P: Dict[int, EncoderGameState] = create_game_states(
-        5, variant_name, game_state_cls=EncoderGameState, deck=deck
-    )
+    hand_strs = [
+        ["b1", "p5", "r3", "b2"],
+        ["y1", "y5", "p4", "p3"],
+        ["g2", "p1", "g5", "r4"],
+        ["b3", "p2", "y3", "p4"],
+        ["g1", "g1", "g1", "g4"],
+    ]
+    STATES_5P = construct_test_state("No Variant", hand_strs)
 
     give_clue(STATES_5P, 0, RANK_CLUE, 3, 1)
-    play(STATES_5P, 7)
-    draw(STATES_5P, 20, 1, 0, 2)
+    play_draw(STATES_5P, 7, 20, 0, 2)
     give_clue(STATES_5P, 2, RANK_CLUE, 1, 0)
     give_clue(STATES_5P, 3, RANK_CLUE, 4, 2)
 
@@ -272,36 +320,20 @@ def test_superposition2():
 
 def test_superposition3():
     # https://hanab.live/shared-replay/1024885
-    variant_name = "Prism (5 Suits)"
-    # fmt: off
-    deck = get_deck_from_tuples(
-        [
-            (1, 2), (2, 4), (0, 4), (2, 5),
-            (0, 1), (2, 3), (1, 2), (2, 2),
-            (0, 2), (3, 3), (3, 1), (3, 1),
-            (1, 1), (2, 1), (0, 1), (0, 2),
-            (0, 3), (2, 3), (0, 1), (4, 1),
-        ]
-    )
-    # fmt: on
-
-    # p0: g5 [ 3], r4 [ 2], b4 [ 1], y2 [ 0]
-    # p1: g2 [ 7], y2 [ 6], g3 [ 5], r1 [ 4]
-    # p2: b1 [11], b1 [10], b3 [ 9], r2 [ 8]
-    # p3: r2 [15], r1 [14], g1 [13], y1 [12]
-    # p4: i1 [19], r1 [18], g3 [17], r3 [16]
-
-    STATES_5P: Dict[int, EncoderGameState] = create_game_states(
-        5, variant_name, game_state_cls=EncoderGameState, deck=deck
-    )
+    hand_strs = [
+        ["g5", "r4", "b4", "y2"],
+        ["g2", "y2", "g3", "r1"],
+        ["b1", "b1", "b3", "r2"],
+        ["r2", "r1", "g1", "y1"],
+        ["i1", "r1", "g3", "r3"],
+    ]
+    STATES_5P = construct_test_state("Prism (5 Suits)", hand_strs)
 
     give_clue(STATES_5P, 0, RANK_CLUE, 1, 3)  # t1
     give_clue(STATES_5P, 1, RANK_CLUE, 4, 0)  # t2
-    play(STATES_5P, 11)
-    draw(STATES_5P, 20, 2, 4, 4)  # t3
+    play_draw(STATES_5P, 11, 20, 4, 4)  # t3
     give_clue(STATES_5P, 3, RANK_CLUE, 2, 0)  # t4
-    play(STATES_5P, 19)
-    draw(STATES_5P, 21, 4, 1, 1)  # t5
+    play_draw(STATES_5P, 19, 21, 1, 1)  # t5
     discard(STATES_5P, 14)
 
     check_eq(STATES_5P[4].superpositions[18].triggering_orders, set())
@@ -315,29 +347,15 @@ def test_superposition3():
 
 def test_superposition4():
     # https://hanab.live/shared-replay/1025222
+    hand_strs = [
+        ["y1", "g1", "g4", "g2"],
+        ["r4", "r1", "b3", "r3"],
+        ["r1", "y3", "y2", "i1"],
+        ["g1", "r3", "i1", "y1"],
+        ["y2", "y3", "r4", "y4"],
+    ]
+    STATES_5P = construct_test_state("Prism (5 Suits)", hand_strs)
 
-    variant_name = "Prism (5 Suits)"
-    # fmt: off
-    deck = get_deck_from_tuples(
-        [
-            (2, 2), (2, 4), (2, 1), (1, 1),
-            (0, 3), (3, 3), (0, 1), (0, 4),
-            (4, 1), (1, 2), (1, 3), (0, 1),
-            (1, 1), (4, 1), (0, 3), (2, 1),
-            (1, 4), (0, 4), (1, 3), (1, 2),
-        ]
-    )
-    # fmt: on
-
-    # p0: y1 [ 3], g1 [ 2], g4 [ 1], g2 [ 0]
-    # p1: r4 [ 7], r1 [ 6], b3 [ 5], r3 [ 4]
-    # p2: r1 [11], y3 [10], y2 [ 9], i1 [ 8]
-    # p3: g1 [15], r3 [14], i1 [13], y1 [12]
-    # p4: y2 [19], y3 [18], r4 [17], y4 [16]
-
-    STATES_5P: Dict[int, EncoderGameState] = create_game_states(
-        5, variant_name, game_state_cls=EncoderGameState, deck=deck
-    )
     give_clue(STATES_5P, 0, RANK_CLUE, 1, 1)  # t1
 
     check_eq(STATES_5P[3].superpositions[15].triggering_orders, {11})
@@ -348,8 +366,7 @@ def test_superposition4():
     )
     check_eq(STATES_5P[3].our_candidates[-1], {(0, 1), (1, 1), (2, 1), (3, 1), (4, 1)})
 
-    play(STATES_5P, 6)
-    draw(STATES_5P, 20, 1, 4, 3)  # t2
+    play_draw(STATES_5P, 6, 20, 4, 3)  # t2
     check_eq(STATES_5P[3].superpositions[15].triggering_orders, set())
     check_eq(STATES_5P[3].superpositions[15].actual_num_trash, 0)
     check_eq(
@@ -368,6 +385,79 @@ def test_superposition4():
     check_eq(STATES_5P[3].our_candidates[-1], {(0, 1), (1, 1), (2, 1), (3, 1), (4, 1)})
 
 
+def test_superpositionx():
+    # https://hanab.live/shared-replay/1025753
+    hand_strs = [
+        ["r5", "i2", "b2", "i3"],
+        ["y1", "r3", "i1", "y4"],
+        ["g3", "b4", "r1", "y1"],
+        ["y5", "b5", "g4", "r3"],
+        ["g1", "b4", "g1", "y2"],
+    ]
+    STATES_5P = construct_test_state("Prism (5 Suits)", hand_strs)
+    give_clue(STATES_5P, 0, COLOR_CLUE, 0, 3)
+    play_draw(STATES_5P, 7, 20, 3, 2)
+    give_clue(STATES_5P, 2, RANK_CLUE, 3, 3)
+    give_clue(STATES_5P, 3, RANK_CLUE, 1, 2)
+    play_draw(STATES_5P, 19, 21, 1, 1)  # t5
+    give_clue(STATES_5P, 0, COLOR_CLUE, 1, 3)
+    play_draw(STATES_5P, 5, 22, 4, 4)
+    play_draw(STATES_5P, 9, 23, 0, 2)
+    give_clue(STATES_5P, 3, COLOR_CLUE, 1, 4)
+    play_draw(STATES_5P, 16, 24, 2, 4)  # t10
+    play_draw(STATES_5P, 2, 25, 1, 4)
+    give_clue(STATES_5P, 1, COLOR_CLUE, 2, 0)
+    play_draw(STATES_5P, 23, 26, 0, 2)
+    play_draw(STATES_5P, 12, 27, 3, 3)
+    give_clue(STATES_5P, 4, COLOR_CLUE, 2, 3)  # t15
+    play_draw(STATES_5P, 0, 28, 4, 1)
+    play_draw(STATES_5P, 22, 29, 2, 1)
+    discard_draw(STATES_5P, 26, 30, 0, 1)
+    give_clue(STATES_5P, 3, RANK_CLUE, 1, 4)
+    discard_draw(STATES_5P, 21, 31, 1, 3)  # t20
+    discard_draw(STATES_5P, 28, 32, 0, 1)
+    discard_draw(STATES_5P, 29, 33, 0, 4)
+    give_clue(STATES_5P, 2, COLOR_CLUE, 3, 3)
+    STATES_5P[0].print()
+
+
+def test_superposition5():
+    # https://hanab.live/shared-replay/1025781
+    hand_strs = [
+        ["i4", "b5", "r1", "r5"],
+        ["i1", "r2", "r4", "r1"],
+        ["g3", "b3", "i1", "b1"],
+        ["b3", "y3", "r4", "g1"],
+        ["b2", "b4", "b2", "b4"],
+    ]
+    STATES_5P = construct_test_state("Prism (5 Suits)", hand_strs)
+    give_clue(STATES_5P, 0, RANK_CLUE, 3, 3)
+    play_draw(STATES_5P, 7, 20, 2, 4)
+    give_clue(STATES_5P, 2, RANK_CLUE, 1, 3)
+    give_clue(STATES_5P, 3, COLOR_CLUE, 3, 2)
+    give_clue(STATES_5P, 4, RANK_CLUE, 3, 2)  # t5
+    play_draw(STATES_5P, 1, 21, 4, 1)
+    play_draw(STATES_5P, 6, 22, 1, 1)
+    give_clue(STATES_5P, 2, RANK_CLUE, 1, 3)
+    play_draw(STATES_5P, 12, 23, 1, 1)
+    give_clue(STATES_5P, 4, RANK_CLUE, 1, 2)  # t10
+    discard_draw(STATES_5P, 21, 24, 4, 4)
+
+    check_eq(STATES_5P[1].superpositions[4].triggering_orders, {8, 23})
+    check_eq(STATES_5P[1].our_candidates[0], {(1, 5)})
+    play_draw(STATES_5P, 22, 25, 1, 4)
+
+    check_eq(STATES_5P[0].superpositions[0].triggering_orders, {8})
+    check_eq(STATES_5P[0].superpositions[0].actual_num_trash, 0)
+    check_eq(STATES_5P[0].our_candidates[0], {(0, 5)})
+    check_eq(STATES_5P[1].superpositions[4].triggering_orders, {8})
+    check_eq(STATES_5P[1].superpositions[4].actual_num_trash, 1)
+    check_eq(4 in STATES_5P[1].trashy_orders, True)
+    check_eq(STATES_5P[2].superpositions[8].triggering_orders, set())
+    check_eq(STATES_5P[2].superpositions[8].actual_num_trash, 0)
+    check_eq(STATES_5P[2].our_candidates[0], {(3, 1)})
+
+
 def test_all():
     t0 = dt.datetime.now()
     test_evaluate_clue_score()
@@ -375,9 +465,11 @@ def test_all():
     test_superposition2()
     test_superposition3()
     test_superposition4()
+    test_superposition5()
     t1 = dt.datetime.now()
     print(f"All tests passed in {(t1 - t0).total_seconds():.2f}s!")
 
 
 if __name__ == "__main__":
     test_all()
+    # test_superposition5()
