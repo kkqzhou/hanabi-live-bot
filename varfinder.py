@@ -83,8 +83,7 @@ if __name__ == "__main__":
         "Cow",
         "Synesthesia",
         "Clue Starved",
-        "Funnels",
-        "Chimneys",
+        "Critical Fours",
     ]
     include_substrings = None
 

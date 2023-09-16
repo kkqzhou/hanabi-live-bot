@@ -256,7 +256,10 @@ def get_all_touched_cards(
                 ):
                     cards.add((i, rank))
 
-                if suit in available_color_clues[clue_value]:
+                if suit in available_color_clues[clue_value] or (
+                    suit in {"Prism", "Dark Prism"}
+                    and (available_color_clues[clue_value], rank) in prism_touch
+                ):
                     if (
                         "White-Ones" in variant_name
                         or "Light-Pink-Ones" in variant_name
@@ -272,11 +275,8 @@ def get_all_touched_cards(
                     else:
                         cards.add((i, rank))
 
-                if (
-                    suit in {"Prism", "Dark Prism"}
-                    and (available_color_clues[clue_value], rank) in prism_touch
-                ):
-                    cards.add((i, rank))
+                # if :
+                #    cards.add((i, rank))
 
                 if (
                     (
@@ -422,6 +422,38 @@ def is_whiteish_rainbowy(variant_name):
         if num_colors != 1:
             return True
     return False
+
+
+def get_cards_touched_dict(
+    variant_name: str,
+    target_hand: List[Card],
+    target_index: int,
+    clue_type_values: Tuple[int, int],
+) -> Dict[Tuple[int, int, int], Set[Tuple[int, int]]]:
+    clue_to_cards_touched = {}
+    available_color_clues = get_available_color_clues(variant_name)
+    available_rank_clues = get_available_rank_clues(variant_name)
+    for clue_type, clue_value in clue_type_values:
+        # prevent illegal clues from being given
+        if clue_type == COLOR_CLUE and clue_value >= len(available_color_clues):
+            continue
+        if clue_type == RANK_CLUE and clue_value not in available_rank_clues:
+            continue
+
+        cards_touched = get_all_touched_cards(clue_type, clue_value, variant_name)
+        cards_touched_in_target_hand = [
+            card
+            for card in target_hand
+            if (card.suit_index, card.rank) in cards_touched
+        ]
+        if len(cards_touched_in_target_hand):
+            clue_to_cards_touched[
+                (clue_type, clue_value)
+            ] = cards_touched_in_target_hand
+    return {
+        (clue_value, clue_type, target_index): cards_touched
+        for (clue_type, clue_value), cards_touched in clue_to_cards_touched.items()
+    }
 
 
 def get_candidates_list_str(
@@ -1012,6 +1044,9 @@ class GameState:
         self, target_index: int, clue_type_values: Tuple[int, int]
     ) -> Dict[Tuple[int, int, int], Set[Tuple[int, int]]]:
         target_hand = self.hands[target_index]
+        return get_cards_touched_dict(
+            self.variant_name, target_hand, target_index, clue_type_values
+        )
         clue_to_cards_touched = {}
         available_color_clues = get_available_color_clues(self.variant_name)
         available_rank_clues = get_available_rank_clues(self.variant_name)

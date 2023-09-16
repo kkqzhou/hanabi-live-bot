@@ -184,6 +184,12 @@ def test_get_all_touched_cards():
         (C, 0, "Holiday Mix (6 Suits)"): all_suit(1),
         (C, 1, "Holiday Mix (6 Suits)"): all_suit(2),
         (C, 2, "Holiday Mix (6 Suits)"): all_suit(4).union(all_suit(5)),
+        (C, 0, "White-Ones & Prism (6 Suits)"): {(0, 2), (0, 3), (0, 4), (0, 5)},
+        (C, 0, "Light-Pink-Ones & Prism (5 Suits)"): {(0, 2), (0, 3), (0, 4), (0, 5), (4, 5)},
+        (C, 0, "Null-Ones & Prism (5 Suits)"): {(0, 2), (0, 3), (0, 4), (0, 5), (4, 5)},
+        (C, 0, "White-Fives & Prism (6 Suits)"): {(0, 1), (0, 2), (0, 3), (0, 4), (5, 1)},
+        (C, 0, "Light-Pink-Fives & Prism (5 Suits)"): {(0, 1), (0, 2), (0, 3), (0, 4), (4, 1)},
+        (C, 0, "Null-Fives & Prism (5 Suits)"): {(0, 1), (0, 2), (0, 3), (0, 4), (4, 1)},
 
         # TODO: confirm deceptive + funnels/chimneys
         (R, 2, "No Variant"): all_rank(2, range(5)),

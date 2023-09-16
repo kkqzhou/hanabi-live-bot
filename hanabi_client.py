@@ -693,17 +693,6 @@ class HanabiClient:
                 self.play(playable_fives[0], table_id)
                 return
 
-            # priority 3
-            unique_playables = [
-                order
-                for order in sorted_playables
-                if order not in my_good_actions["dupe_in_other_hand"]
-            ]
-            if len(unique_playables):
-                print("PRIO 3")
-                self.play(unique_playables[0], table_id)
-                return
-
             # priority 4
             absolute_playables = [
                 order
@@ -711,7 +700,7 @@ class HanabiClient:
                 if state.is_playable(state.get_candidates(order))
             ]
             if len(absolute_playables):
-                print("PRIO 4")
+                print("PRIO 3")
                 self.play(absolute_playables[0], table_id)
                 return
 
@@ -724,7 +713,7 @@ class HanabiClient:
             )
             for order in sorted_playables:
                 if len(state.get_candidates(order)) == highest_num_candidates:
-                    print("PRIO 5")
+                    print("PRIO 4")
                     self.play(order, table_id)
                     return
 
