@@ -192,7 +192,7 @@ class EncoderGameState(GameState):
         self.other_info_clued_card_orders["trashy_orders"] = set()
         self.superpositions: Dict[int, SuperPosition] = {}  # order -> SuperPosition
         self.identities_called_to_play: Set[Tuple[int, int]] = set()
-        self.dupe_play_score_pct_threshold: float = 0.6
+        self.play_order_queue: List[int] = []
 
     @property
     def hat_clued_card_orders(self) -> Set[int]:
@@ -215,6 +215,27 @@ class EncoderGameState(GameState):
             max_crits = max(max_crits, num_crits)
 
         return max_crits > self.num_cards_in_deck and self.num_cards_in_deck > 0
+
+    @property
+    def endgame_stall_condition(self) -> bool:
+        cond1 = self.clue_tokens > 0 and (
+            self.pace <= self.num_players / 2 or self.num_cards_in_deck == 1
+        )
+        cond2 = self.clue_tokens >= self.num_players and (
+            self.num_cards_in_deck <= self.num_players - 2
+        )
+        return cond1 or cond2
+
+    @property
+    def no_urgency(self) -> bool:
+        return (
+            self.pace > self.num_players / 2
+            and self.num_cards_in_deck > self.num_players - 2
+        )
+
+    @property
+    def can_clue_dupes_as_plays(self) -> bool:
+        return self.score_pct >= 0.66 and self.pace <= self.num_players - 1
 
     def set_variant_name(self, variant_name: str, num_players: int):
         super().set_variant_name(variant_name, num_players)
@@ -344,7 +365,7 @@ class EncoderGameState(GameState):
             for trash_order in removed_trash_orders:
                 # trash is only "unexpected" if we played it
                 if (player_index == self.our_player_index) and (
-                    order in self.hat_clued_card_orders
+                    order in self.hat_clued_card_orders and order in self.superpositions
                 ):
                     superposition.unexpected_trash += 1
                 else:
@@ -364,10 +385,19 @@ class EncoderGameState(GameState):
                 else:
                     if sp_order in self.trashy_orders:
                         self.trashy_orders.remove(sp_order)
+
+                if superposition.get_updated_residue(self.mod_base) == 1:
+                    self.play_order_queue.append(sp_order)
+                    print(f"Updated play order queue (play): {self.play_order_queue}")
                 self.write_note(sp_order, note="", candidates=new_candidates)
+
+        if order in self.play_order_queue:
+            self.play_order_queue = [x for x in self.play_order_queue if x != order]
+            print(f"Deleted {order} from play order queue: {self.play_order_queue}")
 
         if order in self.superpositions:
             del self.superpositions[order]
+
         return super().handle_play(player_index, order, suit_index, rank)
 
     def handle_discard(self, player_index: int, order: int, suit_index: int, rank: int):
@@ -395,9 +425,20 @@ class EncoderGameState(GameState):
                 else:
                     if sp_order in self.trashy_orders:
                         self.trashy_orders.remove(sp_order)
+
+                if superposition.get_updated_residue(self.mod_base) == 1:
+                    self.play_order_queue.append(sp_order)
+                    print(f"Updated play order queue (disc): {self.play_order_queue}")
+
                 self.write_note(sp_order, note="", candidates=new_candidates)
+
+        if order in self.play_order_queue:
+            self.play_order_queue = [x for x in self.play_order_queue if x != order]
+            print(f"Deleted {order} from play order queue: {self.play_order_queue}")
+
         if order in self.superpositions:
             del self.superpositions[order]
+
         return super().handle_discard(player_index, order, suit_index, rank)
 
     def handle_clue(
@@ -429,8 +470,9 @@ class EncoderGameState(GameState):
             identity = left_non_hat_clued.to_tuple()
             if self.is_playable_card(left_non_hat_clued):
                 triggering_orders.add(left_non_hat_clued.order)
-                if identity in self.identities_called_to_play and (
-                    self.score_pct < self.dupe_play_score_pct_threshold
+                if (
+                    identity in self.identities_called_to_play
+                    and not self.can_clue_dupes_as_plays
                 ):
                     other_residue = 0
                 else:
@@ -483,6 +525,10 @@ class EncoderGameState(GameState):
                 else:
                     if left_non_hat_clued.order in self.trashy_orders:
                         self.trashy_orders.remove(left_non_hat_clued.order)
+
+                if my_residue == 1:
+                    self.play_order_queue.append(left_non_hat_clued.order)
+                    print(f"Updated play order queue (clue): {self.play_order_queue}")
 
                 print(f"My ({self.our_player_name}) residue = {my_residue}.")
                 print(f"Hat candidates: {my_implied_ids}")
@@ -663,7 +709,7 @@ class EncoderGameState(GameState):
             identity = lnhc.to_tuple()
             if self.is_playable_card(lnhc):
                 if identity in local_identities_called_to_play and (
-                    self.score_pct < self.dupe_play_score_pct_threshold
+                    not self.can_clue_dupes_as_plays
                 ):
                     sum_of_residues += 0
                 else:
