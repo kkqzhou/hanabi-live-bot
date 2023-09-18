@@ -704,9 +704,11 @@ class HanabiClient:
 
             # priority 3
             if len(state.play_order_queue):
-                print("PRIO 3")
-                self.play(state.play_order_queue[0], table_id)
-                return
+                for order in state.play_order_queue:
+                    if order in sorted_playables:
+                        print("PRIO 3")
+                        self.play(order, table_id)
+                        return
 
             # priority 4
             unique_playables = [

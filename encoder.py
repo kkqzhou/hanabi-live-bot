@@ -152,6 +152,158 @@ def get_playful_mod_table(variant_name: str, preferred_modulus=None):
     return mod_table
 
 
+def get_v1_mod_table(variant_name: str, preferred_modulus=None):
+    # trash is marked as (0, 0)
+    # playable is marked as (-1, 0)
+    # stack x + n is marked as (x, -n)
+    num_suits = len(SUITS[variant_name])
+    if num_suits == 6:
+        if preferred_modulus == 15:
+            mod_table = {
+                0: [(0, 0)],
+                1: [(0, -1)],
+                2: [(1, -1)],
+                3: [(2, -1)],
+                4: [(3, -1)],
+                5: [(4, -1)],
+                6: [(5, -1)],
+                7: [(0, -2), (1, -2)],
+                8: [(2, -2), (3, -2)],
+                9: [(4, -2)],
+                10: [(5, -2)],
+                11: [(0, -3), (1, -3)],
+                12: [(2, -3), (3, -3)],
+                13: [(4, -3), (5, -3)],
+                14: [(i, -j) for i in range(6) for j in {4, 5}],
+            }
+        elif preferred_modulus == 16:
+            mod_table = {
+                0: [(0, 0)],
+                1: [(0, -1)],
+                2: [(1, -1)],
+                3: [(2, -1)],
+                4: [(3, -1)],
+                5: [(4, -1)],
+                6: [(5, -1)],
+                7: [(0, -2), (1, -2)],
+                8: [(2, -2)],
+                9: [(3, -2)],
+                10: [(4, -2)],
+                11: [(5, -2)],
+                12: [(0, -3), (1, -3)],
+                13: [(2, -3), (3, -3)],
+                14: [(4, -3), (5, -3)],
+                15: [(i, -j) for i in range(6) for j in {4, 5}],
+            }
+    elif num_suits == 5:
+        if preferred_modulus == 12:
+            mod_table = {
+                0: [(0, 0)],
+                1: [(0, -1)],
+                2: [(1, -1)],
+                3: [(2, -1)],
+                4: [(3, -1)],
+                5: [(4, -1)],
+                6: [(0, -2), (1, -2)],
+                7: [(2, -2), (3, -2)],
+                8: [(4, -2)],
+                9: [(0, -3), (1, -3)],
+                10: [(2, -3), (3, -3)],
+                11: [(4, -3)] + [(i, -j) for i in range(5) for j in {4, 5}],
+            }
+        elif preferred_modulus == 15:
+            mod_table = {
+                0: [(0, 0)],
+                1: [(0, -1)],
+                2: [(1, -1)],
+                3: [(2, -1)],
+                4: [(3, -1)],
+                5: [(4, -1)],
+                6: [(0, -2)],
+                7: [(1, -2)],
+                8: [(2, -2)],
+                9: [(3, -2)],
+                10: [(4, -2)],
+                11: [(0, -3)],
+                12: [(1, -3)],
+                13: [(2, -3)],
+                14: [(3, -3), (4, -3)] + [(i, -j) for i in range(5) for j in {4, 5}],
+            }
+        elif preferred_modulus == 16:
+            mod_table = {
+                0: [(0, 0)],
+                1: [(0, -1)],
+                2: [(1, -1)],
+                3: [(2, -1)],
+                4: [(3, -1)],
+                5: [(4, -1)],
+                6: [(0, -2)],
+                7: [(1, -2)],
+                8: [(2, -2)],
+                9: [(3, -2)],
+                10: [(4, -2)],
+                11: [(0, -3)],
+                12: [(1, -3)],
+                13: [(2, -3)],
+                14: [(3, -3)],
+                15: [(4, -3)] + [(i, -j) for i in range(5) for j in {4, 5}],
+            }
+    elif num_suits == 4:
+        if preferred_modulus == 12:
+            mod_table = {
+                0: [(0, 0)],
+                1: [(0, -1)],
+                2: [(1, -1)],
+                3: [(2, -1)],
+                4: [(3, -1)],
+                5: [(0, -2)],
+                6: [(1, -2)],
+                7: [(2, -2)],
+                8: [(3, -2)],
+                9: [(0, -3), (1, -3)],
+                10: [(2, -3), (3, -3)],
+                11: [(i, -j) for i in range(4) for j in {4, 5}],
+            }
+        elif preferred_modulus == 15:
+            mod_table = {
+                0: [(0, 0)],
+                1: [(0, -1)],
+                2: [(1, -1)],
+                3: [(2, -1)],
+                4: [(3, -1)],
+                5: [(0, -2)],
+                6: [(1, -2)],
+                7: [(2, -2)],
+                8: [(3, -2)],
+                9: [(0, -3)],
+                10: [(1, -3)],
+                11: [(2, -3)],
+                12: [(3, -3)],
+                13: [(0, -4)],
+                14: [(1, -4), (2, -4), (3, -4), (0, -5), (1, -5), (2, -5), (3, -5)],
+            }
+        elif preferred_modulus == 16:
+            mod_table = {
+                0: [(0, 0)],
+                1: [(0, -1)],
+                2: [(1, -1)],
+                3: [(2, -1)],
+                4: [(3, -1)],
+                5: [(0, -2)],
+                6: [(1, -2)],
+                7: [(2, -2)],
+                8: [(3, -2)],
+                9: [(0, -3)],
+                10: [(1, -3)],
+                11: [(2, -3)],
+                12: [(3, -3)],
+                13: [(0, -4)],
+                14: [(1, -4)],
+                15: [(2, -4), (3, -4), (0, -5), (1, -5), (2, -5), (3, -5)]
+            }
+    return mod_table
+
+
 class SuperPosition:
     def __init__(
         self,
@@ -189,7 +341,7 @@ class EncoderGameState(GameState):
     def __init__(self, variant_name, player_names, our_player_index):
         super().__init__(variant_name, player_names, our_player_index)
         self.other_info_clued_card_orders["hat_clued_card_orders"] = set()
-        self.other_info_clued_card_orders["trashy_orders"] = set()
+        self.other_info_clued_card_orders["trashy_orders"] = []
         self.superpositions: Dict[int, SuperPosition] = {}  # order -> SuperPosition
         self.identities_called_to_play: Set[Tuple[int, int]] = set()
         self.play_order_queue: List[int] = []
@@ -199,7 +351,7 @@ class EncoderGameState(GameState):
         return self.other_info_clued_card_orders["hat_clued_card_orders"]
 
     @property
-    def trashy_orders(self) -> Set[int]:
+    def trashy_orders(self) -> List[int]:
         return self.other_info_clued_card_orders["trashy_orders"]
 
     # various game conditions
@@ -350,6 +502,7 @@ class EncoderGameState(GameState):
             self.identities_called_to_play.remove((suit_index, rank))
 
         order_to_index = self.order_to_index
+        rewrite_note = False
         for sp_order, superposition in self.superpositions.items():
             _, i = order_to_index[sp_order]
             if order in superposition.triggering_orders:
@@ -365,9 +518,12 @@ class EncoderGameState(GameState):
             for trash_order in removed_trash_orders:
                 # trash is only "unexpected" if we played it
                 if (player_index == self.our_player_index) and (
-                    order in self.hat_clued_card_orders and order in self.superpositions
+                    order in self.hat_clued_card_orders
+                    and order in self.superpositions
+                    and not self.can_clue_dupes_as_plays
                 ):
                     superposition.unexpected_trash += 1
+                    rewrite_note = True
                 else:
                     print("A player with known duped card played it")
                 superposition.triggering_orders.remove(trash_order)
@@ -381,7 +537,7 @@ class EncoderGameState(GameState):
                     new_candidates
                 )
                 if superposition.get_updated_residue(self.mod_base) == 0:
-                    self.trashy_orders.add(sp_order)
+                    self.trashy_orders.append(sp_order)
                 else:
                     if sp_order in self.trashy_orders:
                         self.trashy_orders.remove(sp_order)
@@ -389,7 +545,11 @@ class EncoderGameState(GameState):
                 if superposition.get_updated_residue(self.mod_base) == 1:
                     self.play_order_queue.append(sp_order)
                     print(f"Updated play order queue (play): {self.play_order_queue}")
-                self.write_note(sp_order, note="", candidates=new_candidates)
+
+                if rewrite_note:
+                    self.write_note(
+                        sp_order, note="", candidates=self.our_candidates[i]
+                    )
 
         if order in self.play_order_queue:
             self.play_order_queue = [x for x in self.play_order_queue if x != order]
@@ -402,6 +562,7 @@ class EncoderGameState(GameState):
 
     def handle_discard(self, player_index: int, order: int, suit_index: int, rank: int):
         order_to_index = self.order_to_index
+        rewrite_note = False
         for sp_order, superposition in self.superpositions.items():
             _, i = order_to_index[sp_order]
             other_hc_orders_w_discarded_identity = {
@@ -415,13 +576,14 @@ class EncoderGameState(GameState):
             if order in superposition.triggering_orders:
                 if len(other_hc_orders_w_discarded_identity) == 1:
                     superposition.unexpected_trash += 1
+                    rewrite_note = True
                 superposition.triggering_orders.remove(order)
                 new_candidates = superposition.get_sp_identities()
                 self.our_candidates[i] = self.our_possibilities[i].intersection(
                     new_candidates
                 )
                 if superposition.get_updated_residue(self.mod_base) == 0:
-                    self.trashy_orders.add(sp_order)
+                    self.trashy_orders.append(sp_order)
                 else:
                     if sp_order in self.trashy_orders:
                         self.trashy_orders.remove(sp_order)
@@ -430,7 +592,10 @@ class EncoderGameState(GameState):
                     self.play_order_queue.append(sp_order)
                     print(f"Updated play order queue (disc): {self.play_order_queue}")
 
-                self.write_note(sp_order, note="", candidates=new_candidates)
+                if rewrite_note:
+                    self.write_note(
+                        sp_order, note="", candidates=self.our_candidates[i]
+                    )
 
         if order in self.play_order_queue:
             self.play_order_queue = [x for x in self.play_order_queue if x != order]
@@ -521,7 +686,7 @@ class EncoderGameState(GameState):
                     my_implied_ids = my_implied_ids.union(
                         self.identities_called_to_play
                     )
-                    self.trashy_orders.add(left_non_hat_clued.order)
+                    self.trashy_orders.append(left_non_hat_clued.order)
                 else:
                     if left_non_hat_clued.order in self.trashy_orders:
                         self.trashy_orders.remove(left_non_hat_clued.order)
@@ -802,11 +967,9 @@ class EncoderGameState(GameState):
                     num_colors = len(get_available_color_clues(self.variant_name))
                     if num_colors in {2, 4, 5, 6}:
                         color_to_cards_touched = {}
-                        clue_values = (
-                            range(num_colors // 2)
-                            if raw_residue == 2
-                            else range(num_colors // 2, num_colors)
-                        )
+                        clue_values = [
+                            x for x in range(num_colors) if (x - raw_residue) % 2 == 0
+                        ]
                         for clue_value in clue_values:
                             cards_touched = get_all_touched_cards(
                                 COLOR_CLUE, clue_value, self.variant_name
@@ -954,7 +1117,7 @@ class EncoderGameState(GameState):
                 if is_whiteish_rainbowy(self.variant_name):
                     num_colors = len(get_available_color_clues(self.variant_name))
                     if num_colors in {2, 4, 5, 6}:
-                        raw_residue = 2 if clue_value in range(num_colors // 2) else 3
+                        raw_residue = 2 if clue_value % 2 == 0 else 3
                     else:
                         raise NotImplementedError
                 else:
@@ -994,14 +1157,19 @@ class EncoderGameState(GameState):
         hand = self.hands[player_index]
         candidates_list = self.all_candidates_list[player_index]
 
-        trash = [
-            hand[i].order
-            for i, candidates in enumerate(candidates_list)
-            if self.is_trash(candidates) or hand[i].order in self.trashy_orders
-        ]
+        trash = sorted(
+            [
+                hand[i].order
+                for i, candidates in enumerate(candidates_list)
+                if self.is_trash(candidates) or hand[i].order in self.trashy_orders
+            ]
+        )
         playable = []
         for i, candidates in enumerate(candidates_list):
-            if self.is_trash(candidates) or hand[i].order in self.trashy_orders:
+            if self.is_trash(candidates):
+                continue
+
+            if hand[i].order in self.trashy_orders and len(candidates) > 1:
                 continue
 
             if (
