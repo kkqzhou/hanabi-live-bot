@@ -80,22 +80,91 @@ def get_available_rank_clues(variant_name: str):
     return [1, 2, 3, 4, 5]
 
 
+"""
+print(SUITS["Candy Corn Mix (5 Suits)"])
+print(SUITS["Candy Corn Mix (6 Suits)"])
+['Red', 'Orange D2', 'Yellow', 'White', 'Brown']
+['Red', 'Orange D2', 'Yellow', 'White', 'Brown', 'Cocoa Rainbow']
+"""
+
+
 def get_available_color_clues(variant_name: str):
-    # TODO - handle nonstandard suits like ambiguous, dual color, etc.
     available_color_clues = []
-    for color in [
+    # TODO: confirm the following:
+    # Mahogany D, Cardinal D, Navy D, Tan D, AD suits
+    """
+    Dual-Color (6 Suits)
+    ['Orange D', 'Purple D', 'Mahogany D', 'Green D', 'Tan D', 'Navy D']
+    Dual-Color (5 Suits)
+    ['Orange D2', 'Lime D', 'Teal D', 'Indigo D', 'Cardinal D']
+    Ambiguous & Dual-Color
+    ['Tangelo AD', 'Peach AD', 'Orchid AD', 'Violet AD', 'Lime AD', 'Forest AD']
+    """
+
+    for suit in [
         "Red",
-        "Yellow",
-        "Green",
-        "Blue",
-        "Purple",
-        "Teal",
-        "Black",
-        "Pink",
-        "Dark Pink",
-        "Brown",
-        "Dark Brown",
+        "Tomato",
+        "Tomato VA",
+        "Orange D",
+        "Orange D2",
+        "Purple D",
+        "Cardinal D",
+        "Tangelo AD",
+        "Peach AD",
+        "Orchid AD",
+        "Violet AD",
     ]:
+        if suit in SUITS[variant_name]:
+            available_color_clues.append("Red")
+            break
+
+    for suit in [
+        "Yellow",
+        "Orange D",
+        "Orange D2",
+        "Yam MD",
+        "Tangelo AD",
+        "Peach AD",
+        "Lime AD",
+        "Forest AD",
+    ]:
+        if suit in SUITS[variant_name]:
+            available_color_clues.append("Yellow")
+            break
+
+    for suit in ["Green", "Lime", "Lime D", "Teal D", "Geas MD"]:
+        if suit in SUITS[variant_name]:
+            available_color_clues.append("Green")
+            break
+
+    for suit in [
+        "Blue",
+        "Sky",
+        "Sky VA",
+        "Sky EA",
+        "Purple D",
+        "Indigo D",
+        "Beatnik MD",
+        "Lime AD",
+        "Forest AD",
+        "Orchid AD",
+        "Violet AD",
+    ]:
+        if suit in SUITS[variant_name]:
+            available_color_clues.append("Blue")
+            break
+
+    for suit in ["Purple", "Cardinal D", "Plum MD"]:
+        if suit in SUITS[variant_name]:
+            available_color_clues.append("Purple")
+            break
+
+    for suit in ["Teal", "Taupe MD"]:
+        if suit in SUITS[variant_name]:
+            available_color_clues.append("Teal")
+            break
+
+    for color in ["Black", "Pink", "Dark Pink", "Brown", "Dark Brown"]:
         if color in SUITS[variant_name]:
             available_color_clues.append(color)
 
@@ -128,8 +197,7 @@ def get_all_cards_with_multiplicity(variant_name: str) -> List[Tuple[int, int]]:
 def get_all_touched_cards(
     clue_type: int, clue_value: int, variant_name: str
 ) -> Set[Tuple[int, int]]:
-    # TODO - handle nonstandard suits like ambiguous, dual color, etc.
-    # TODO - handle special 1s and 5s
+    # TODO - handle dual color
     available_color_clues = get_available_color_clues(variant_name)
     prism_touch = list(zip(available_color_clues * 5, [1, 2, 3, 4, 5]))
     cards = set()
@@ -146,7 +214,52 @@ def get_all_touched_cards(
                 }:
                     cards.add((i, rank))
 
-                if suit in available_color_clues[clue_value]:
+                if (
+                    suit
+                    in {
+                        "Tomato",
+                        "Mahogany",
+                        "Tomato VA",
+                        "Mahogany VA",
+                        "Carrot VA",
+                    }
+                    and available_color_clues[clue_value] == "Red"
+                ):
+                    cards.add((i, rank))
+
+                if (
+                    suit
+                    in {
+                        "Lime",
+                        "Forest",
+                    }
+                    and available_color_clues[clue_value] == "Green"
+                ):
+                    cards.add((i, rank))
+
+                if (
+                    suit
+                    in {
+                        "Sky",
+                        "Navy",
+                        "Sky VA",
+                        "Navy VA",
+                        "Berry VA",
+                        "Sky EA",
+                        "Navy EA",
+                        "Berry EA",
+                        "Ice EA",
+                        "Sapphire EA",
+                        "Ocean EA",
+                    }
+                    and available_color_clues[clue_value] == "Blue"
+                ):
+                    cards.add((i, rank))
+
+                if suit in available_color_clues[clue_value] or (
+                    suit in {"Prism", "Dark Prism"}
+                    and (available_color_clues[clue_value], rank) in prism_touch
+                ):
                     if (
                         "White-Ones" in variant_name
                         or "Light-Pink-Ones" in variant_name
@@ -162,11 +275,8 @@ def get_all_touched_cards(
                     else:
                         cards.add((i, rank))
 
-                if (
-                    suit in {"Prism", "Dark Prism"}
-                    and (available_color_clues[clue_value], rank) in prism_touch
-                ):
-                    cards.add((i, rank))
+                # if :
+                #    cards.add((i, rank))
 
                 if (
                     (
@@ -224,11 +334,21 @@ def get_all_touched_cards(
                     "Null",
                     "Dark Null",
                 }:
-                    if (clue_value == rank) and ("Odds and Evens" not in variant_name):
+                    if "Odds and Evens" in variant_name and (clue_value == rank % 2):
                         cards.add((i, rank))
-                    elif (clue_value == rank % 2) and (
-                        "Odds and Evens" in variant_name
-                    ):
+                    elif "Deceptive-Ones" in variant_name and (rank == 1):
+                        if i % 4 == (clue_value - 2):
+                            cards.add((i, rank))
+                    elif "Deceptive-Fives" in variant_name and (rank == 5):
+                        if (i % 4) == (clue_value - 1):
+                            cards.add((i, rank))
+                    elif "Funnels" in variant_name:
+                        if rank <= clue_value:
+                            cards.add((i, rank))
+                    elif "Chimneys" in variant_name:
+                        if rank >= clue_value:
+                            cards.add((i, rank))
+                    elif clue_value == rank:
                         cards.add((i, rank))
                 if (
                     (
@@ -277,11 +397,16 @@ def get_all_non_touched_cards(clue_type: int, clue_value: int, variant_name: str
 
 
 def is_brownish_pinkish(variant_name):
-    num_suits = len(SUITS[variant_name])
-    for rank in range(1, 6):
+    num_ranks_touching_card = {x: 0 for x in get_all_cards(variant_name)}
+    for rank in get_available_rank_clues(variant_name):
         cards_touched = get_all_touched_cards(RANK_CLUE, rank, variant_name)
-        if len(cards_touched) != num_suits:
+        for x in cards_touched:
+            num_ranks_touching_card[x] += 1
+
+    for _, num_ranks in num_ranks_touching_card.items():
+        if num_ranks != 1:
             return True
+
     return False
 
 
@@ -293,10 +418,42 @@ def is_whiteish_rainbowy(variant_name):
         for x in cards_touched:
             num_colors_touching_card[x] += 1
 
-    for i, num_colors in num_colors_touching_card.items():
+    for _, num_colors in num_colors_touching_card.items():
         if num_colors != 1:
             return True
     return False
+
+
+def get_cards_touched_dict(
+    variant_name: str,
+    target_hand: List[Card],
+    target_index: int,
+    clue_type_values: Tuple[int, int],
+) -> Dict[Tuple[int, int, int], Set[Tuple[int, int]]]:
+    clue_to_cards_touched = {}
+    available_color_clues = get_available_color_clues(variant_name)
+    available_rank_clues = get_available_rank_clues(variant_name)
+    for clue_type, clue_value in clue_type_values:
+        # prevent illegal clues from being given
+        if clue_type == COLOR_CLUE and clue_value >= len(available_color_clues):
+            continue
+        if clue_type == RANK_CLUE and clue_value not in available_rank_clues:
+            continue
+
+        cards_touched = get_all_touched_cards(clue_type, clue_value, variant_name)
+        cards_touched_in_target_hand = [
+            card
+            for card in target_hand
+            if (card.suit_index, card.rank) in cards_touched
+        ]
+        if len(cards_touched_in_target_hand):
+            clue_to_cards_touched[
+                (clue_type, clue_value)
+            ] = cards_touched_in_target_hand
+    return {
+        (clue_value, clue_type, target_index): cards_touched
+        for (clue_type, clue_value), cards_touched in clue_to_cards_touched.items()
+    }
 
 
 def get_candidates_list_str(
@@ -320,7 +477,7 @@ def get_candidates_list_str(
                             _char = "O"
                     output += _char
                 elif poss_list is not None and (i, rank) in poss_list[hand_order]:
-                    output += "x"
+                    output += "-"
                 else:
                     output += "."
 
@@ -457,6 +614,10 @@ class GameState:
     @property
     def our_possibilities(self) -> List[Set[Tuple[int, int]]]:
         return self.all_possibilities_list[self.our_player_index]
+
+    @property
+    def our_num_crits(self) -> int:
+        return sum([self.is_critical(candidates) for candidates in self.our_candidates])
 
     @property
     def num_1s_played(self) -> int:
@@ -883,6 +1044,9 @@ class GameState:
         self, target_index: int, clue_type_values: Tuple[int, int]
     ) -> Dict[Tuple[int, int, int], Set[Tuple[int, int]]]:
         target_hand = self.hands[target_index]
+        return get_cards_touched_dict(
+            self.variant_name, target_hand, target_index, clue_type_values
+        )
         clue_to_cards_touched = {}
         available_color_clues = get_available_color_clues(self.variant_name)
         available_rank_clues = get_available_rank_clues(self.variant_name)
