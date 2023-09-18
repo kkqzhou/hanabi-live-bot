@@ -3,7 +3,7 @@ import websocket
 
 from constants import ACTION, COLOR_CLUE, RANK_CLUE
 from game_state import GameState
-from encoder import EncoderGameState
+from encoder import EncoderV1GameState, EncoderV2GameState
 from h_group import HGroupGameState
 import traceback
 from typing import Dict, Type
@@ -31,7 +31,8 @@ class HanabiClient:
             convention.replace("_", "").replace("-", "").replace(" ", "").lower()
         )
         self.game_state_cls: Type[GameState] = {
-            "encoder": EncoderGameState,
+            "encoderv1": EncoderV1GameState,
+            "encoderv2": EncoderV2GameState,
             "hgroup": HGroupGameState,
         }[self.convention_name]
         self.disconnect_on_game_end = disconnect_on_game_end
@@ -488,8 +489,10 @@ class HanabiClient:
         # The server expects to be told about actions in the following format:
         # https://github.com/Hanabi-Live/hanabi-live/blob/main/server/src/command.go
         state = self.games[table_id]
-        if isinstance(state, EncoderGameState):
-            self.encoder(state, table_id)
+        if isinstance(state, EncoderV1GameState):
+            self.encoder_v1(state, table_id)
+        elif isinstance(state, EncoderV2GameState):
+            self.encoder_v2(state, table_id)
         elif isinstance(state, HGroupGameState):
             self.hgroup(state, table_id)
         else:
@@ -628,7 +631,278 @@ class HanabiClient:
             burn_clue_card = state.hands[state.next_player_index][0]
         self.clue(state.next_player_index, RANK_CLUE, burn_clue_card.rank, table_id)
 
-    def encoder(self, state: EncoderGameState, table_id: int):
+    def encoder_v1(self, state: EncoderV1GameState, table_id: int):
+        # TODO: implement elim
+        good_actions = {
+            player_index: state.get_good_actions(player_index)
+            for player_index in range(state.num_players)
+        }
+        my_good_actions = good_actions[state.our_player_index]
+        print(state.our_player_name + " good actions:")
+        for action_type, orders in good_actions.items():
+            print(action_type, orders)
+
+        max_crits = 0
+        for player_index in range(state.num_players):
+            if player_index == state.our_player_index:
+                continue
+            num_crits = sum(
+                [state.is_critical_card(card) for card in state.hands[player_index]]
+            )
+            max_crits = max(max_crits, num_crits)
+
+        cannot_play = (
+            max_crits > state.num_cards_in_deck and state.num_cards_in_deck > 0
+        )
+        if cannot_play:
+            print(f"CANNOT PLAY! {max_crits} crits > {state.num_cards_in_deck} cards")
+
+        if len(my_good_actions["playable"]) and not cannot_play:
+            # sort playables by lowest possible rank of candidates
+            sorted_playables = sorted(
+                my_good_actions["playable"],
+                key=lambda order: min([x[1] for x in state.get_candidates(order)]),
+            )
+            num_crits_i_have = sum([state.is_critical(x) for x in state.our_candidates])
+
+            # priority 0
+            fk_orders = state.get_fully_known_card_orders(
+                state.our_player_index, keyed_on_order=True
+            )
+            for order in sorted_playables:
+                if order in fk_orders:
+                    identity = fk_orders[order]
+                    next_playable = (identity[0], identity[1] + 1)
+                    all_others_hc_cards = state.get_all_other_players_hat_clued_cards()
+                    dire_circumstances = (
+                        identity not in state.criticals
+                        and num_crits_i_have > state.num_cards_in_deck
+                    )
+                    if dire_circumstances:
+                        print(f"Would love to play {identity} but cannot")
+
+                    if next_playable in all_others_hc_cards and not dire_circumstances:
+                        print("PRIO 0")
+                        self.play(order, table_id)
+                        return
+
+            # priority 1
+            key_crits = [
+                order
+                for order in sorted_playables
+                if state.is_critical(state.get_candidates(order))
+                and max([x[1] for x in state.get_candidates(order)]) <= 3
+            ]
+            if len(key_crits):
+                print("PRIO 1")
+                self.play(key_crits[0], table_id)
+                return
+
+            # priority 2
+            playable_fives = [
+                order
+                for order in my_good_actions["playable"]
+                if min([x[1] for x in state.get_candidates(order)]) == 5
+            ]
+            if len(playable_fives):
+                print("PRIO 2")
+                self.play(playable_fives[0], table_id)
+                return
+
+            # priority 3
+            unique_playables = [
+                order
+                for order in sorted_playables
+                if order not in my_good_actions["dupe_in_other_hand"]
+            ]
+            if len(unique_playables):
+                print("PRIO 3")
+                self.play(unique_playables[0], table_id)
+                return
+
+            # all the playables we have are duped in someone else's hand
+            # figure out where the duped card is and how to best resolve it
+            for playable_order in sorted_playables:
+                playable_candidates = state.get_candidates(playable_order)
+                if len(playable_candidates) >= 2:
+                    print("TOO MANY CANDIDATES TO WORRY ABOUT, PLAYING THIS")
+                    self.play(playable_order, table_id)
+                    return
+
+                suit_index, rank = list(playable_candidates)[0]
+                for player_index, hand in state.hands.items():
+                    if player_index == state.our_player_index:
+                        continue
+
+                    for i, card in enumerate(hand):
+                        if (suit_index, rank) != (card.suit_index, card.rank):
+                            continue
+
+                        candidates = state.all_candidates_list[player_index][i]
+                        candidates_minus_my_play = candidates.difference(
+                            {(suit_index, rank)}
+                        )
+                        if state.is_trash(candidates_minus_my_play):
+                            print("OTHER GUY WILL KNOW ITS TRASH AFTER I PLAY THIS")
+                            self.play(playable_order, table_id)
+                            return
+
+                        what_other_guy_sees = (
+                            state.get_all_other_players_hat_clued_cards(player_index)
+                        )
+                        unique_candidates_after_my_play = (
+                            candidates_minus_my_play.difference(what_other_guy_sees)
+                        )
+                        if not len(unique_candidates_after_my_play) or state.is_trash(
+                            unique_candidates_after_my_play
+                        ):
+                            print("OTHER GUY WILL KNOW ITS DUPED AFTER I PLAY THIS")
+                            self.play(playable_order, table_id)
+                            return
+
+            if state.pace <= state.num_players - 2:
+                print("PACE IS TOO LOW, NEED TO PLAY!!!")
+                self.play(sorted_playables[0], table_id)
+            elif state.clue_tokens >= 8:
+                print("AT 8 TOKENS, CAN'T DISCARD!!!")
+                self.play(sorted_playables[0], table_id)
+            else:
+                print("NO DUPES WILL DEFINITELY RESOLVE, GDing this instead")
+                self.discard(sorted_playables[0], table_id)
+            return
+
+        cannot_yolo = (state.bombs > 1) and (state.pace > state.num_players - 3)
+        if len(my_good_actions["yoloable"]) and not cannot_yolo and not cannot_play:
+            self.play(my_good_actions["yoloable"][0], table_id)
+            return
+
+        lnhcs = state.get_leftmost_non_hat_clued_cards()
+        num_useful_cards = 0
+        for card in lnhcs:
+            if card is None:
+                continue
+            if (card.suit_index, card.rank) in state.trash:
+                continue
+            num_useful_cards += 1
+
+        # clues that narrow down useful cards the most are good, lowest scores first
+        legal_clues = state.get_legal_clues()
+        legal_clue_to_score = {
+            (clue_value, clue_type, target_index): state.evaluate_clue_score(
+                clue_value, clue_type, target_index
+            )
+            for (clue_value, clue_type, target_index) in legal_clues
+        }
+        legal_hat_clues = sorted(legal_clue_to_score.items(), key=lambda x: x[-1])
+        print("All legal clues available:")
+        for x, score in legal_hat_clues:
+            print(f"{x}: {score}")
+
+        if state.clue_tokens >= 2:
+            if 0 <= state.score_pct < 0.24:
+                r = {2: 0.79, 3: 0.76, 4: 0.7, 5: 0.6, 6: 0.45, 7: 0.3, 8: 0.0}[
+                    min(8, state.clue_tokens + max(0, 4 - state.pace))
+                ]
+                num_useful_cards_touched = int(r * min(4, state.num_players - 1))
+            elif 0.24 <= state.score_pct < 0.48:
+                r = {2: 0.7, 3: 0.67, 4: 0.6, 5: 0.48, 6: 0.36, 7: 0.2, 8: 0.0}[
+                    min(8, state.clue_tokens + max(0, 4 - state.pace))
+                ]
+                num_useful_cards_touched = int(r * min(4, state.num_players - 1))
+            elif 0.48 <= state.score_pct < 0.72:
+                r = {2: 0.6, 3: 0.55, 4: 0.48, 5: 0.4, 6: 0.3, 7: 0.17, 8: 0.0}[
+                    min(8, state.clue_tokens + max(0, 4 - state.pace))
+                ]
+                num_useful_cards_touched = int(r * min(4, state.num_players - 1))
+            else:
+                r = {2: 0.48, 3: 0.36, 4: 0.24, 5: 0.16, 6: 0.1, 7: 0.05, 8: 0.0}[
+                    min(8, state.clue_tokens + max(0, 4 - state.pace))
+                ]
+                num_useful_cards_touched = int(r * min(4, state.num_players - 1))
+
+            if num_useful_cards >= num_useful_cards_touched:
+                for (clue_value, clue_type, target_index), _ in legal_hat_clues:
+                    print(f"USEFUL CLUE! Score = {state.score_pct:.3f}, we see {lnhcs}")
+                    self.clue(target_index, clue_type, clue_value, table_id)
+                    return
+
+        # basic stall in endgame
+        if state.clue_tokens > 0 and (state.pace < 3 or state.num_cards_in_deck == 1):
+            for (clue_value, clue_type, target_index), _ in legal_hat_clues:
+                print("STALL CLUE!")
+                self.clue(target_index, clue_type, clue_value, table_id)
+                return
+
+        # basic stall in endgame
+        if state.clue_tokens >= state.num_players and (
+            state.num_cards_in_deck <= state.num_players / 2
+        ):
+            for (clue_value, clue_type, target_index), _ in legal_hat_clues:
+                print("STALL CLUE 2!")
+                self.clue(target_index, clue_type, clue_value, table_id)
+                return
+
+        # discard if nothing better to do
+        if state.clue_tokens < 8:
+            if len(my_good_actions["trash"]):
+                print("X TRASH")
+                self.discard(my_good_actions["trash"][0], table_id)
+                return
+            if len(my_good_actions["dupe_in_own_hand"]):
+                print("X DUPE_IN_OWN_HAND")
+                self.discard(my_good_actions["dupe_in_own_hand"][0], table_id)
+                return
+            if len(my_good_actions["dupe_in_other_hand"]):
+                print("X DUPE_IN_OTHER_HAND")
+                self.discard(my_good_actions["dupe_in_other_hand"][0], table_id)
+                return
+            if len(my_good_actions["dupe_in_other_hand_or_trash"]):
+                print("X DUPE_IN_OTHER_HAND_OR_TRASH")
+                self.discard(
+                    my_good_actions["dupe_in_other_hand_or_trash"][0], table_id
+                )
+                return
+
+        # unless we have no safe actions
+        if state.clue_tokens > 0 and len(legal_hat_clues):
+            for (clue_value, clue_type, target_index), _ in legal_hat_clues:
+                print("CLUE BECAUSE NO SAFE ACTION!")
+                self.clue(target_index, clue_type, clue_value, table_id)
+                return
+
+        if state.clue_tokens < 8:
+            if len(my_good_actions["seen_in_other_hand"]):
+                print("DISCARDING CARD SEEN BUT NOT TOUCHED!")
+                self.discard(my_good_actions["seen_in_other_hand"][0], table_id)
+                return
+
+            for i, candidates in enumerate(state.our_candidates):
+                if state.our_hand[-i - 1].order not in state.hat_clued_card_orders:
+                    print("SACRIFICING NON HAT CLUED SLOT " + str(i) + "!")
+                    self.discard(state.our_hand[-i - 1].order, table_id)
+                    return
+
+            for i, candidates in enumerate(state.our_candidates):
+                if (
+                    not len(candidates.intersection(state.criticals))
+                    or i == len(state.our_candidates) - 1
+                ):
+                    print("SACRIFICING SLOT " + str(len(state.our_hand) - i - 1) + "!")
+                    self.discard(state.our_hand[i].order, table_id)
+                    return
+        else:
+            for i, candidates in enumerate(state.our_candidates):
+                if (
+                    not len(candidates.intersection(state.criticals))
+                    or i == len(state.our_candidates) - 1
+                ):
+                    print(
+                        "STALL BOMBING SLOT " + str(len(state.our_hand) - i - 1) + "!"
+                    )
+                    self.play(state.our_hand[i].order, table_id)
+                    return
+
+    def encoder_v2(self, state: EncoderV2GameState, table_id: int):
         # TODO: implement elim
         good_actions = {
             player_index: state.get_good_actions(player_index)

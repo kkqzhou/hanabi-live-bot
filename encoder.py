@@ -12,7 +12,7 @@ from game_state import (
     get_available_rank_clues,
 )
 
-from typing import Dict, List, Set, Optional, Tuple
+from typing import Callable, Dict, List, Set, Optional, Tuple
 from copy import deepcopy
 
 
@@ -299,9 +299,125 @@ def get_v1_mod_table(variant_name: str, preferred_modulus=None):
                 12: [(3, -3)],
                 13: [(0, -4)],
                 14: [(1, -4)],
-                15: [(2, -4), (3, -4), (0, -5), (1, -5), (2, -5), (3, -5)]
+                15: [(2, -4), (3, -4), (0, -5), (1, -5), (2, -5), (3, -5)],
             }
     return mod_table
+
+
+def get_special_hat_clues_dict(variant_name: str):
+    all_3color_wr_vars = [
+        var
+        for var in SUITS
+        if len(get_available_color_clues(var)) == 3 and is_whiteish_rainbowy(var)
+    ]
+    all_1color_vars = [var for var in SUITS if len(get_available_color_clues(var)) == 1]
+    all_lp_1_vars = [var for var in SUITS if "Light-Pink-Ones" in var]
+    all_mr_1_vars = [var for var in SUITS if "Muddy-Rainbow-Ones" in var]
+    all_oe_vars = [var for var in SUITS if "Odds and Evens" in var]
+    base_dct = {
+        var: {
+            0: [(RANK_CLUE, 5), (RANK_CLUE, 1)],
+            1: [(COLOR_CLUE, 0), (RANK_CLUE, 2)],
+            2: [(COLOR_CLUE, 1), (RANK_CLUE, 3)],
+            3: [(COLOR_CLUE, 2), (RANK_CLUE, 4)],
+        }
+        for var in all_3color_wr_vars
+    }
+
+    for var in all_1color_vars:
+        base_dct[var] = {
+            0: [(COLOR_CLUE, 0)],
+            1: [(RANK_CLUE, 1), (RANK_CLUE, 5)],
+            2: [(RANK_CLUE, 2), (RANK_CLUE, 3)],
+            3: [(RANK_CLUE, 4)],
+        }
+
+    for var in all_lp_1_vars:
+        avail_color_clues = get_available_color_clues(var)
+        if len(avail_color_clues) == 6:
+            base_dct[var] = {
+                0: [(RANK_CLUE, 5), (COLOR_CLUE, 0)],
+                1: [(RANK_CLUE, 2), (COLOR_CLUE, 1), (COLOR_CLUE, 2)],
+                2: [(RANK_CLUE, 3), (COLOR_CLUE, 3), (COLOR_CLUE, 4)],
+                3: [(RANK_CLUE, 4), (COLOR_CLUE, 5)],
+            }
+        elif len(avail_color_clues) == 5:
+            base_dct[var] = {
+                0: [(RANK_CLUE, 5), (COLOR_CLUE, 0)],
+                1: [(RANK_CLUE, 2), (COLOR_CLUE, 1), (COLOR_CLUE, 2)],
+                2: [(RANK_CLUE, 3), (COLOR_CLUE, 3)],
+                3: [(RANK_CLUE, 4), (COLOR_CLUE, 4)],
+            }
+        elif len(avail_color_clues) == 4:
+            base_dct[var] = {
+                0: [(RANK_CLUE, 5), (COLOR_CLUE, 0)],
+                1: [(RANK_CLUE, 2), (COLOR_CLUE, 1)],
+                2: [(RANK_CLUE, 3), (COLOR_CLUE, 2)],
+                3: [(RANK_CLUE, 4), (COLOR_CLUE, 3)],
+            }
+
+    for var in all_mr_1_vars:
+        avail_color_clues = get_available_color_clues(var)
+        if len(avail_color_clues) == 6:
+            base_dct[var] = {
+                0: [(COLOR_CLUE, 0), (RANK_CLUE, 5)],
+                1: [(COLOR_CLUE, 1), (COLOR_CLUE, 2), (RANK_CLUE, 2)],
+                2: [(COLOR_CLUE, 3), (COLOR_CLUE, 4), (RANK_CLUE, 3)],
+                3: [(COLOR_CLUE, 5), (RANK_CLUE, 4)],
+            }
+        elif len(avail_color_clues) == 5:
+            base_dct[var] = {
+                0: [(COLOR_CLUE, 0), (RANK_CLUE, 5)],
+                1: [(COLOR_CLUE, 1), (COLOR_CLUE, 2), (RANK_CLUE, 2)],
+                2: [(COLOR_CLUE, 3), (RANK_CLUE, 3)],
+                3: [(COLOR_CLUE, 4), (RANK_CLUE, 4)],
+            }
+        elif len(avail_color_clues) == 4:
+            base_dct[var] = {
+                0: [(COLOR_CLUE, 0), (RANK_CLUE, 5)],
+                1: [(COLOR_CLUE, 1), (RANK_CLUE, 2)],
+                2: [(COLOR_CLUE, 2), (RANK_CLUE, 3)],
+                3: [(COLOR_CLUE, 3), (RANK_CLUE, 4)],
+            }
+
+    for var in all_oe_vars:
+        avail_color_clues = get_available_color_clues(var)
+        if len(avail_color_clues) == 6:
+            base_dct[var] = {
+                0: [(RANK_CLUE, 0), (COLOR_CLUE, 0)],
+                1: [(RANK_CLUE, 1)],
+                2: [(COLOR_CLUE, 1), (COLOR_CLUE, 2)],
+                3: [(COLOR_CLUE, 3), (COLOR_CLUE, 4), (COLOR_CLUE, 5)],
+            }
+        elif len(avail_color_clues) == 5:
+            base_dct[var] = {
+                0: [(RANK_CLUE, 0), (COLOR_CLUE, 0)],
+                1: [(RANK_CLUE, 1)],
+                2: [(COLOR_CLUE, 1), (COLOR_CLUE, 2)],
+                3: [(COLOR_CLUE, 3), (COLOR_CLUE, 4)],
+            }
+        elif len(avail_color_clues) == 4:
+            base_dct[var] = {
+                0: [(RANK_CLUE, 0)],
+                1: [(RANK_CLUE, 1)],
+                2: [(COLOR_CLUE, 0), (COLOR_CLUE, 1)],
+                3: [(COLOR_CLUE, 2), (COLOR_CLUE, 3)],
+            }
+
+    base_dct["Valentine Mix (6 Suits)"] = {
+        0: [(RANK_CLUE, 5), (RANK_CLUE, 1)],
+        1: [(COLOR_CLUE, 0), (RANK_CLUE, 2)],
+        2: [(COLOR_CLUE, 1), (RANK_CLUE, 3)],
+        3: [(RANK_CLUE, 4)],
+    }
+    base_dct["Valentine Mix (5 Suits)"] = {
+        0: [(RANK_CLUE, 5), (RANK_CLUE, 1)],
+        1: [(COLOR_CLUE, 0), (RANK_CLUE, 2)],
+        2: [(COLOR_CLUE, 1), (RANK_CLUE, 3)],
+        3: [(RANK_CLUE, 4)],
+    }
+
+    return base_dct.get(variant_name, {})
 
 
 class SuperPosition:
@@ -337,14 +453,12 @@ class SuperPosition:
         return self.__str__()
 
 
-class EncoderGameState(GameState):
-    def __init__(self, variant_name, player_names, our_player_index):
+class BaseEncoderGameState(GameState):
+    def __init__(self, variant_name, player_names, our_player_index, mod_table_func):
+        self.mod_table_func: Callable[[str, int], Dict] = mod_table_func
         super().__init__(variant_name, player_names, our_player_index)
         self.other_info_clued_card_orders["hat_clued_card_orders"] = set()
         self.other_info_clued_card_orders["trashy_orders"] = []
-        self.superpositions: Dict[int, SuperPosition] = {}  # order -> SuperPosition
-        self.identities_called_to_play: Set[Tuple[int, int]] = set()
-        self.play_order_queue: List[int] = []
 
     @property
     def hat_clued_card_orders(self) -> Set[int]:
@@ -385,18 +499,14 @@ class EncoderGameState(GameState):
             and self.num_cards_in_deck > self.num_players - 2
         )
 
-    @property
-    def can_clue_dupes_as_plays(self) -> bool:
-        return self.score_pct >= 0.66 and self.pace <= self.num_players - 1
-
     def set_variant_name(self, variant_name: str, num_players: int):
         super().set_variant_name(variant_name, num_players)
         if num_players == 4:
-            self.mod_table = get_playful_mod_table(variant_name, preferred_modulus=12)
+            self.mod_table = self.mod_table_func(variant_name, preferred_modulus=12)
         elif num_players == 5:
-            self.mod_table = get_playful_mod_table(variant_name, preferred_modulus=16)
+            self.mod_table = self.mod_table_func(variant_name, preferred_modulus=16)
         elif num_players == 6:
-            self.mod_table = get_playful_mod_table(variant_name, preferred_modulus=20)
+            self.mod_table = self.mod_table_func(variant_name, preferred_modulus=20)
         else:
             raise NotImplementedError
 
@@ -496,6 +606,470 @@ class EncoderGameState(GameState):
                 result[residue] = set()
             result[residue].add(identity)
         return result
+
+    def get_special_hat_clues(self, target_index: int, clue_mapping_only=False) -> Dict:
+        dct = get_special_hat_clues_dict(self.variant_name)
+        if clue_mapping_only:
+            return dct if len(dct) else None
+
+        return (
+            {
+                raw_residue: self.get_cards_touched_dict(target_index, clue_type_values)
+                for raw_residue, clue_type_values in dct.items()
+            }
+            if len(dct)
+            else None
+        )
+
+    def get_legal_clues_helper(
+        self, sum_of_residues: int
+    ) -> Dict[Tuple[int, int, int], Set[Tuple[int, int]]]:
+        num_residues = self.num_residues_per_player
+        target_index = (
+            self.our_player_index + 1 + (sum_of_residues // num_residues)
+        ) % self.num_players
+        raw_residue = sum_of_residues % num_residues
+        target_hand = self.hands[target_index]
+
+        assert target_index != self.our_player_index
+        print(
+            "Evaluating legal hat clues - sum of residues =",
+            sum_of_residues,
+            "target_index",
+            target_index,
+        )
+        maybe_special_hat_clues = self.get_special_hat_clues(target_index)
+        if maybe_special_hat_clues is not None:
+            return maybe_special_hat_clues[raw_residue]
+
+        if num_residues == 4:
+            if raw_residue in {0, 1}:
+                if is_brownish_pinkish(self.variant_name):
+                    if raw_residue == 0:
+                        return self.get_cards_touched_dict(
+                            target_index,
+                            [(RANK_CLUE, 1), (RANK_CLUE, 3), (RANK_CLUE, 5)],
+                        )
+                    else:
+                        return self.get_cards_touched_dict(
+                            target_index,
+                            [(RANK_CLUE, 2), (RANK_CLUE, 4)],
+                        )
+                else:
+                    rightmost_unnumbered = self.get_rightmost_unnumbered_card(
+                        target_index
+                    )
+                    # iterate over rank clues
+                    # TODO: special 1s/5s
+                    rank_to_cards_touched = {}
+                    for clue_value in get_available_rank_clues(self.variant_name):
+                        cards_touched = get_all_touched_cards(
+                            RANK_CLUE, clue_value, self.variant_name
+                        )
+                        cards_touched_in_target_hand = [
+                            card
+                            for card in target_hand
+                            if (card.suit_index, card.rank) in cards_touched
+                        ]
+                        if len(cards_touched_in_target_hand):
+                            rank_to_cards_touched[
+                                clue_value
+                            ] = cards_touched_in_target_hand
+
+                    if rightmost_unnumbered is None:
+                        clue_rank = (
+                            min(rank_to_cards_touched)
+                            if raw_residue == 0
+                            else max(rank_to_cards_touched)
+                        )
+                        return {
+                            (clue_value, RANK_CLUE, target_index): cards_touched
+                            for clue_value, cards_touched in rank_to_cards_touched.items()
+                            if clue_value == clue_rank
+                        }
+                    else:
+                        if raw_residue == 0:
+                            return {
+                                (clue_value, RANK_CLUE, target_index): cards_touched
+                                for clue_value, cards_touched in rank_to_cards_touched.items()
+                                if rightmost_unnumbered in cards_touched
+                            }
+                        else:
+                            return {
+                                (clue_value, RANK_CLUE, target_index): cards_touched
+                                for clue_value, cards_touched in rank_to_cards_touched.items()
+                                if rightmost_unnumbered not in cards_touched
+                            }
+
+            elif raw_residue in {2, 3}:
+                if is_whiteish_rainbowy(self.variant_name):
+                    num_colors = len(get_available_color_clues(self.variant_name))
+                    if num_colors in {2, 4, 5, 6}:
+                        color_to_cards_touched = {}
+                        clue_values = [
+                            x for x in range(num_colors) if (x - raw_residue) % 2 == 0
+                        ]
+                        for clue_value in clue_values:
+                            cards_touched = get_all_touched_cards(
+                                COLOR_CLUE, clue_value, self.variant_name
+                            )
+                            cards_touched_in_target_hand = [
+                                card
+                                for card in target_hand
+                                if (card.suit_index, card.rank) in cards_touched
+                            ]
+                            if len(cards_touched_in_target_hand):
+                                color_to_cards_touched[
+                                    clue_value
+                                ] = cards_touched_in_target_hand
+
+                        return {
+                            (clue_value, COLOR_CLUE, target_index): cards_touched
+                            for clue_value, cards_touched in color_to_cards_touched.items()
+                        }
+                    else:
+                        raise NotImplementedError
+                else:
+                    rightmost_uncolored = self.get_rightmost_uncolored_card(
+                        target_index
+                    )
+                    # iterate over color clues
+                    color_to_cards_touched = {}
+                    for clue_value, _ in enumerate(
+                        get_available_color_clues(self.variant_name)
+                    ):
+                        cards_touched = get_all_touched_cards(
+                            COLOR_CLUE, clue_value, self.variant_name
+                        )
+                        cards_touched_in_target_hand = [
+                            card
+                            for card in target_hand
+                            if (card.suit_index, card.rank) in cards_touched
+                        ]
+                        if len(cards_touched_in_target_hand):
+                            color_to_cards_touched[
+                                clue_value
+                            ] = cards_touched_in_target_hand
+
+                    if rightmost_uncolored is None:
+                        clue_color = (
+                            min(color_to_cards_touched)
+                            if raw_residue == 2
+                            else max(color_to_cards_touched)
+                        )
+                        return {
+                            (clue_value, COLOR_CLUE, target_index): cards_touched
+                            for clue_value, cards_touched in color_to_cards_touched.items()
+                            if clue_value == clue_color
+                        }
+                    else:
+                        if raw_residue == 2:
+                            return {
+                                (clue_value, COLOR_CLUE, target_index): cards_touched
+                                for clue_value, cards_touched in color_to_cards_touched.items()
+                                if rightmost_uncolored in cards_touched
+                            }
+                        else:
+                            return {
+                                (clue_value, COLOR_CLUE, target_index): cards_touched
+                                for clue_value, cards_touched in color_to_cards_touched.items()
+                                if rightmost_uncolored not in cards_touched
+                            }
+
+        elif num_residues == 3:
+            raise NotImplementedError
+        else:
+            raise NotImplementedError
+
+    def get_legal_clues(self) -> Dict[Tuple[int, int, int], Set[Tuple[int, int]]]:
+        # (clue_value, clue_type, target_index) -> cards_touched
+        raise NotImplementedError
+
+    def evaluate_clue_score(self, clue_value, clue_type, target_index) -> int:
+        all_cards_touched_by_clue = get_all_touched_cards(
+            clue_type, clue_value, self.variant_name
+        )
+        good_card_indices = [
+            i
+            for i in range(len(self.hands[target_index]))
+            if not self.is_trash_card(self.hands[target_index][i])
+        ]
+        candidates_list = self.all_candidates_list[target_index]
+        score = 1
+
+        for i in good_card_indices:
+            if self.hands[target_index][i].to_tuple() in all_cards_touched_by_clue:
+                new_candidates = candidates_list[i].intersection(
+                    all_cards_touched_by_clue
+                )
+            else:
+                new_candidates = candidates_list[i].difference(
+                    all_cards_touched_by_clue
+                )
+            score *= len(new_candidates)
+
+        return score
+
+    def get_hat_residue(
+        self,
+        clue_giver: int,
+        target_index: int,
+        clue_type: int,
+        clue_value: int,
+        card_orders,
+    ):
+        num_residues = self.num_residues_per_player
+        rightmost_unnumbered = self.get_rightmost_unnumbered_card(target_index)
+        rightmost_uncolored = self.get_rightmost_uncolored_card(target_index)
+
+        clue_mappings = self.get_special_hat_clues(target_index, clue_mapping_only=True)
+        if clue_mappings is not None:
+            for raw_residue, clue_type_values in clue_mappings.items():
+                for _type, _value in clue_type_values:
+                    if clue_type == _type and clue_value == _value:
+                        return (
+                            raw_residue
+                            + ((target_index - clue_giver - 1) % self.num_players)
+                            * num_residues
+                        )
+
+        if num_residues == 4:
+            if clue_type == RANK_CLUE:
+                if is_brownish_pinkish(self.variant_name):
+                    raw_residue = 0 if clue_value in {1, 3, 5} else 1
+                else:
+                    if rightmost_unnumbered is None:
+                        all_ranks_clued = []
+                        for card in self.hands[target_index]:
+                            all_ranks_clued += self.rank_clued_card_orders[card.order]
+
+                        if clue_value == min(all_ranks_clued):
+                            raw_residue = 0
+                        elif clue_value == max(all_ranks_clued):
+                            raw_residue = 1
+                        else:
+                            raise IndentationError
+                    else:
+                        if rightmost_unnumbered.order in card_orders:
+                            raw_residue = 0
+                        else:
+                            raw_residue = 1
+            elif clue_type == COLOR_CLUE:
+                if is_whiteish_rainbowy(self.variant_name):
+                    num_colors = len(get_available_color_clues(self.variant_name))
+                    if num_colors in {2, 4, 5, 6}:
+                        raw_residue = 2 if clue_value % 2 == 0 else 3
+                    else:
+                        raise NotImplementedError
+                else:
+                    if rightmost_uncolored is None:
+                        all_colors_clued = []
+                        for card in self.hands[target_index]:
+                            all_colors_clued += self.color_clued_card_orders[card.order]
+
+                        if clue_value == min(all_colors_clued):
+                            raw_residue = 2
+                        elif clue_value == max(all_colors_clued):
+                            raw_residue = 3
+                        else:
+                            raise IndentationError
+                    else:
+                        if rightmost_uncolored.order in card_orders:
+                            raw_residue = 2
+                        else:
+                            raw_residue = 3
+            else:
+                raise ImportError
+        elif num_residues == 3:
+            raise NotImplementedError
+        else:
+            raise NotImplementedError
+
+        return (
+            raw_residue
+            + ((target_index - clue_giver - 1) % self.num_players) * num_residues
+        )
+
+    def get_good_actions(self, player_index: int) -> Dict[str, List[int]]:
+        raise NotImplementedError
+
+    def write_note(self, order: int, note: str, candidates=None, append=True):
+        if order in self.trashy_orders:
+            super().write_note(order=order, note="[kt]", candidates=None, append=append)
+            return
+
+        super().write_note(order=order, note=note, candidates=candidates, append=append)
+
+
+class EncoderV1GameState(BaseEncoderGameState):
+    def __init__(self, variant_name, player_names, our_player_index):
+        super().__init__(variant_name, player_names, our_player_index, get_v1_mod_table)
+
+    def handle_clue(
+        self,
+        clue_giver: int,
+        target_index: int,
+        clue_type: int,
+        clue_value: int,
+        card_orders,
+    ):
+        order_to_index = self.order_to_index
+        identity_to_residue = self.identity_to_residue
+        residue_to_identities = self.residue_to_identities
+        hat_residue = self.get_hat_residue(
+            clue_giver, target_index, clue_type, clue_value, card_orders
+        )
+
+        sum_of_others_residues = 0
+        for player_index, hand in self.hands.items():
+            if player_index in {self.our_player_index, clue_giver}:
+                continue
+
+            left_non_hat_clued = self.get_leftmost_non_hat_clued_card(player_index)
+            if left_non_hat_clued is None:
+                continue
+
+            other_residue = identity_to_residue[
+                (left_non_hat_clued.suit_index, left_non_hat_clued.rank)
+            ]
+            print(
+                self.player_names[player_index]
+                + " "
+                + str(left_non_hat_clued)
+                + " has residue "
+                + str(other_residue)
+            )
+            sum_of_others_residues += other_residue
+
+            _, i = order_to_index[left_non_hat_clued.order]
+            new_candidates = self.all_candidates_list[player_index][i].intersection(
+                residue_to_identities[other_residue]
+            )
+            if len(new_candidates):
+                self.all_candidates_list[player_index][i] = new_candidates
+
+                self.write_note(
+                    left_non_hat_clued.order, note="", candidates=new_candidates
+                )
+                self.hat_clued_card_orders.add(left_non_hat_clued.order)
+            else:
+                self.write_note(
+                    left_non_hat_clued.order,
+                    note="someone messed up and gave a bad hat clue",
+                )
+
+        if self.our_player_index != clue_giver:
+            my_residue = (hat_residue - sum_of_others_residues) % self.mod_base
+            print(f"My ({self.our_player_name})) residue = {my_residue}.")
+            print(f"Hat candidates: {residue_to_identities[my_residue]}")
+            left_non_hat_clued = self.get_leftmost_non_hat_clued_card(
+                self.our_player_index
+            )
+            if left_non_hat_clued is not None:
+                _, i = order_to_index[left_non_hat_clued.order]
+                new_candidates = self.all_candidates_list[self.our_player_index][
+                    i
+                ].intersection(residue_to_identities[my_residue])
+                self.all_candidates_list[self.our_player_index][i] = new_candidates
+                self.write_note(
+                    left_non_hat_clued.order, note="", candidates=new_candidates
+                )
+                self.hat_clued_card_orders.add(left_non_hat_clued.order)
+
+        return super().handle_clue(
+            clue_giver, target_index, clue_type, clue_value, card_orders
+        )
+
+    def get_legal_clues(self) -> Dict[Tuple[int, int, int], Set[Tuple[int, int]]]:
+        # (clue_value, clue_type, target_index) -> cards_touched
+        sum_of_residues = 0
+        identity_to_residue = self.identity_to_residue
+        for player_index, hand in self.hands.items():
+            if player_index == self.our_player_index:
+                continue
+            lnhc = self.get_leftmost_non_hat_clued_card(player_index)
+            if lnhc is None:
+                continue
+
+            sum_of_residues += identity_to_residue[(lnhc.suit_index, lnhc.rank)]
+
+        sum_of_residues = sum_of_residues % self.mod_base
+        return self.get_legal_clues_helper(sum_of_residues)
+
+    def get_good_actions(self, player_index: int) -> Dict[str, List[int]]:
+        all_other_players_cards = self.get_all_other_players_cards(player_index)
+        all_op_unknown_hat_clued_cards = self.get_all_other_players_hat_clued_cards(
+            player_index, no_singletons=True
+        )
+        hand = self.hands[player_index]
+        candidates_list = self.all_candidates_list[player_index]
+
+        playable = [
+            hand[i].order
+            for i, candidates in enumerate(candidates_list)
+            if self.is_playable(candidates)
+        ]
+        trash = [
+            hand[i].order
+            for i, candidates in enumerate(candidates_list)
+            if self.is_trash(candidates)
+        ]
+        yoloable = []
+        for i, candidates in enumerate(candidates_list):
+            if hand[i].order not in self.hat_clued_card_orders:
+                # don't yolo cards we haven't explicitly touched lol
+                continue
+
+            if self.is_trash(candidates):
+                continue
+
+            if self.is_playable(candidates.difference(self.trash)):
+                yoloable.append(hand[i].order)
+
+        dupe_in_own_hand = []
+        dupe_in_other_hand = []
+        dupe_in_other_hand_or_trash = []
+        seen_in_other_hand = []
+
+        fully_knowns = self.get_fully_known_card_orders(player_index)
+        for _, orders in fully_knowns.items():
+            if len(orders) > 1:
+                dupe_in_own_hand += orders[1:]
+
+        for i, candidates in enumerate(candidates_list):
+            # only count unknown hat clued cards for the purposes of determining "dupedness"
+            if not len(candidates.difference(all_op_unknown_hat_clued_cards)):
+                dupe_in_other_hand.append(hand[i].order)
+            elif not len(
+                candidates.difference(all_op_unknown_hat_clued_cards.union(self.trash))
+            ):
+                dupe_in_other_hand_or_trash.append(hand[i].order)
+            elif not len(candidates.difference(all_other_players_cards)):
+                seen_in_other_hand.append(hand[i].order)
+
+        return {
+            "playable": playable,
+            "trash": trash,
+            "yoloable": yoloable,
+            "dupe_in_own_hand": dupe_in_own_hand,
+            "dupe_in_other_hand": dupe_in_other_hand,
+            "dupe_in_other_hand_or_trash": dupe_in_other_hand_or_trash,
+            "seen_in_other_hand": seen_in_other_hand,
+        }
+
+
+class EncoderV2GameState(BaseEncoderGameState):
+    def __init__(self, variant_name, player_names, our_player_index):
+        super().__init__(
+            variant_name, player_names, our_player_index, get_playful_mod_table
+        )
+        self.superpositions: Dict[int, SuperPosition] = {}  # order -> SuperPosition
+        self.identities_called_to_play: Set[Tuple[int, int]] = set()
+        self.play_order_queue: List[int] = []
+
+    @property
+    def can_clue_dupes_as_plays(self) -> bool:
+        return self.score_pct >= 0.66 and self.pace <= self.num_players - 1
 
     def handle_play(self, player_index: int, order: int, suit_index: int, rank: int):
         if (suit_index, rank) in self.identities_called_to_play:
@@ -726,142 +1300,9 @@ class EncoderGameState(GameState):
             clue_giver, target_index, clue_type, clue_value, card_orders
         )
 
-    def get_special_hat_clues(
-        self, variant_name: str, target_index: int, clue_mapping_only=False
-    ) -> Dict:
-        all_3color_wr_vars = [
-            var
-            for var in SUITS
-            if len(get_available_color_clues(var)) == 3 and is_whiteish_rainbowy(var)
-        ]
-        all_1color_vars = [
-            var for var in SUITS if len(get_available_color_clues(var)) == 1
-        ]
-        all_lp_1_vars = [var for var in SUITS if "Light-Pink-Ones" in var]
-        all_mr_1_vars = [var for var in SUITS if "Muddy-Rainbow-Ones" in var]
-        all_oe_vars = [var for var in SUITS if "Odds and Evens" in var]
-        base_dct = {
-            var: {
-                0: [(RANK_CLUE, 5), (RANK_CLUE, 1)],
-                1: [(COLOR_CLUE, 0), (RANK_CLUE, 2)],
-                2: [(COLOR_CLUE, 1), (RANK_CLUE, 3)],
-                3: [(COLOR_CLUE, 2), (RANK_CLUE, 4)],
-            }
-            for var in all_3color_wr_vars
-        }
-
-        for var in all_1color_vars:
-            base_dct[var] = {
-                0: [(COLOR_CLUE, 0)],
-                1: [(RANK_CLUE, 1), (RANK_CLUE, 5)],
-                2: [(RANK_CLUE, 2), (RANK_CLUE, 3)],
-                3: [(RANK_CLUE, 4)],
-            }
-
-        for var in all_lp_1_vars:
-            avail_color_clues = get_available_color_clues(var)
-            if len(avail_color_clues) == 6:
-                base_dct[var] = {
-                    0: [(RANK_CLUE, 5), (COLOR_CLUE, 0)],
-                    1: [(RANK_CLUE, 2), (COLOR_CLUE, 1), (COLOR_CLUE, 2)],
-                    2: [(RANK_CLUE, 3), (COLOR_CLUE, 3), (COLOR_CLUE, 4)],
-                    3: [(RANK_CLUE, 4), (COLOR_CLUE, 5)],
-                }
-            elif len(avail_color_clues) == 5:
-                base_dct[var] = {
-                    0: [(RANK_CLUE, 5), (COLOR_CLUE, 0)],
-                    1: [(RANK_CLUE, 2), (COLOR_CLUE, 1), (COLOR_CLUE, 2)],
-                    2: [(RANK_CLUE, 3), (COLOR_CLUE, 3)],
-                    3: [(RANK_CLUE, 4), (COLOR_CLUE, 4)],
-                }
-            elif len(avail_color_clues) == 4:
-                base_dct[var] = {
-                    0: [(RANK_CLUE, 5), (COLOR_CLUE, 0)],
-                    1: [(RANK_CLUE, 2), (COLOR_CLUE, 1)],
-                    2: [(RANK_CLUE, 3), (COLOR_CLUE, 2)],
-                    3: [(RANK_CLUE, 4), (COLOR_CLUE, 3)],
-                }
-
-        for var in all_mr_1_vars:
-            avail_color_clues = get_available_color_clues(var)
-            if len(avail_color_clues) == 6:
-                base_dct[var] = {
-                    0: [(COLOR_CLUE, 0), (RANK_CLUE, 5)],
-                    1: [(COLOR_CLUE, 1), (COLOR_CLUE, 2), (RANK_CLUE, 2)],
-                    2: [(COLOR_CLUE, 3), (COLOR_CLUE, 4), (RANK_CLUE, 3)],
-                    3: [(COLOR_CLUE, 5), (RANK_CLUE, 4)],
-                }
-            elif len(avail_color_clues) == 5:
-                base_dct[var] = {
-                    0: [(COLOR_CLUE, 0), (RANK_CLUE, 5)],
-                    1: [(COLOR_CLUE, 1), (COLOR_CLUE, 2), (RANK_CLUE, 2)],
-                    2: [(COLOR_CLUE, 3), (RANK_CLUE, 3)],
-                    3: [(COLOR_CLUE, 4), (RANK_CLUE, 4)],
-                }
-            elif len(avail_color_clues) == 4:
-                base_dct[var] = {
-                    0: [(COLOR_CLUE, 0), (RANK_CLUE, 5)],
-                    1: [(COLOR_CLUE, 1), (RANK_CLUE, 2)],
-                    2: [(COLOR_CLUE, 2), (RANK_CLUE, 3)],
-                    3: [(COLOR_CLUE, 3), (RANK_CLUE, 4)],
-                }
-
-        for var in all_oe_vars:
-            avail_color_clues = get_available_color_clues(var)
-            if len(avail_color_clues) == 6:
-                base_dct[var] = {
-                    0: [(RANK_CLUE, 0), (COLOR_CLUE, 0)],
-                    1: [(RANK_CLUE, 1)],
-                    2: [(COLOR_CLUE, 1), (COLOR_CLUE, 2)],
-                    3: [(COLOR_CLUE, 3), (COLOR_CLUE, 4), (COLOR_CLUE, 5)],
-                }
-            elif len(avail_color_clues) == 5:
-                base_dct[var] = {
-                    0: [(RANK_CLUE, 0), (COLOR_CLUE, 0)],
-                    1: [(RANK_CLUE, 1)],
-                    2: [(COLOR_CLUE, 1), (COLOR_CLUE, 2)],
-                    3: [(COLOR_CLUE, 3), (COLOR_CLUE, 4)],
-                }
-            elif len(avail_color_clues) == 4:
-                base_dct[var] = {
-                    0: [(RANK_CLUE, 0)],
-                    1: [(RANK_CLUE, 1)],
-                    2: [(COLOR_CLUE, 0), (COLOR_CLUE, 1)],
-                    3: [(COLOR_CLUE, 2), (COLOR_CLUE, 3)],
-                }
-
-        base_dct["Valentine Mix (6 Suits)"] = {
-            0: [(RANK_CLUE, 5), (RANK_CLUE, 1)],
-            1: [(COLOR_CLUE, 0), (RANK_CLUE, 2)],
-            2: [(COLOR_CLUE, 1), (RANK_CLUE, 3)],
-            3: [(RANK_CLUE, 4)],
-        }
-        base_dct["Valentine Mix (5 Suits)"] = {
-            0: [(RANK_CLUE, 5), (RANK_CLUE, 1)],
-            1: [(COLOR_CLUE, 0), (RANK_CLUE, 2)],
-            2: [(COLOR_CLUE, 1), (RANK_CLUE, 3)],
-            3: [(RANK_CLUE, 4)],
-        }
-
-        dct = base_dct.get(variant_name, {})
-
-        if clue_mapping_only:
-            return dct if len(dct) else None
-
-        return (
-            {
-                raw_residue: self.get_cards_touched_dict(target_index, clue_type_values)
-                for raw_residue, clue_type_values in dct.items()
-            }
-            if len(dct)
-            else None
-        )
-
     def get_legal_clues(self) -> Dict[Tuple[int, int, int], Set[Tuple[int, int]]]:
         # (clue_value, clue_type, target_index) -> cards_touched
         sum_of_residues = 0
-        num_residues = self.num_residues_per_player
-
         identity_to_residue = self.identity_to_residue
         local_identities_called_to_play = deepcopy(self.identities_called_to_play)
         for player_index, hand in self.hands.items():
@@ -884,270 +1325,7 @@ class EncoderGameState(GameState):
                 sum_of_residues += identity_to_residue[identity]
 
         sum_of_residues = sum_of_residues % self.mod_base
-        target_index = (
-            self.our_player_index + 1 + (sum_of_residues // num_residues)
-        ) % self.num_players
-        raw_residue = sum_of_residues % num_residues
-        target_hand = self.hands[target_index]
-
-        assert target_index != self.our_player_index
-        print(
-            "Evaluating legal hat clues - sum of residues =",
-            sum_of_residues,
-            "target_index",
-            target_index,
-        )
-        maybe_special_hat_clues = self.get_special_hat_clues(
-            self.variant_name, target_index
-        )
-        if maybe_special_hat_clues is not None:
-            return maybe_special_hat_clues[raw_residue]
-
-        if num_residues == 4:
-            if raw_residue in {0, 1}:
-                if is_brownish_pinkish(self.variant_name):
-                    if raw_residue == 0:
-                        return self.get_cards_touched_dict(
-                            target_index,
-                            [(RANK_CLUE, 1), (RANK_CLUE, 3), (RANK_CLUE, 5)],
-                        )
-                    else:
-                        return self.get_cards_touched_dict(
-                            target_index,
-                            [(RANK_CLUE, 2), (RANK_CLUE, 4)],
-                        )
-                else:
-                    rightmost_unnumbered = self.get_rightmost_unnumbered_card(
-                        target_index
-                    )
-                    # iterate over rank clues
-                    # TODO: special 1s/5s
-                    rank_to_cards_touched = {}
-                    for clue_value in get_available_rank_clues(self.variant_name):
-                        cards_touched = get_all_touched_cards(
-                            RANK_CLUE, clue_value, self.variant_name
-                        )
-                        cards_touched_in_target_hand = [
-                            card
-                            for card in target_hand
-                            if (card.suit_index, card.rank) in cards_touched
-                        ]
-                        if len(cards_touched_in_target_hand):
-                            rank_to_cards_touched[
-                                clue_value
-                            ] = cards_touched_in_target_hand
-
-                    if rightmost_unnumbered is None:
-                        clue_rank = (
-                            min(rank_to_cards_touched)
-                            if raw_residue == 0
-                            else max(rank_to_cards_touched)
-                        )
-                        return {
-                            (clue_value, RANK_CLUE, target_index): cards_touched
-                            for clue_value, cards_touched in rank_to_cards_touched.items()
-                            if clue_value == clue_rank
-                        }
-                    else:
-                        if raw_residue == 0:
-                            return {
-                                (clue_value, RANK_CLUE, target_index): cards_touched
-                                for clue_value, cards_touched in rank_to_cards_touched.items()
-                                if rightmost_unnumbered in cards_touched
-                            }
-                        else:
-                            return {
-                                (clue_value, RANK_CLUE, target_index): cards_touched
-                                for clue_value, cards_touched in rank_to_cards_touched.items()
-                                if rightmost_unnumbered not in cards_touched
-                            }
-
-            elif raw_residue in {2, 3}:
-                if is_whiteish_rainbowy(self.variant_name):
-                    num_colors = len(get_available_color_clues(self.variant_name))
-                    if num_colors in {2, 4, 5, 6}:
-                        color_to_cards_touched = {}
-                        clue_values = [
-                            x for x in range(num_colors) if (x - raw_residue) % 2 == 0
-                        ]
-                        for clue_value in clue_values:
-                            cards_touched = get_all_touched_cards(
-                                COLOR_CLUE, clue_value, self.variant_name
-                            )
-                            cards_touched_in_target_hand = [
-                                card
-                                for card in target_hand
-                                if (card.suit_index, card.rank) in cards_touched
-                            ]
-                            if len(cards_touched_in_target_hand):
-                                color_to_cards_touched[
-                                    clue_value
-                                ] = cards_touched_in_target_hand
-
-                        return {
-                            (clue_value, COLOR_CLUE, target_index): cards_touched
-                            for clue_value, cards_touched in color_to_cards_touched.items()
-                        }
-                    else:
-                        raise NotImplementedError
-                else:
-                    rightmost_uncolored = self.get_rightmost_uncolored_card(
-                        target_index
-                    )
-                    # iterate over color clues
-                    color_to_cards_touched = {}
-                    for clue_value, _ in enumerate(
-                        get_available_color_clues(self.variant_name)
-                    ):
-                        cards_touched = get_all_touched_cards(
-                            COLOR_CLUE, clue_value, self.variant_name
-                        )
-                        cards_touched_in_target_hand = [
-                            card
-                            for card in target_hand
-                            if (card.suit_index, card.rank) in cards_touched
-                        ]
-                        if len(cards_touched_in_target_hand):
-                            color_to_cards_touched[
-                                clue_value
-                            ] = cards_touched_in_target_hand
-
-                    if rightmost_uncolored is None:
-                        clue_color = (
-                            min(color_to_cards_touched)
-                            if raw_residue == 2
-                            else max(color_to_cards_touched)
-                        )
-                        return {
-                            (clue_value, COLOR_CLUE, target_index): cards_touched
-                            for clue_value, cards_touched in color_to_cards_touched.items()
-                            if clue_value == clue_color
-                        }
-                    else:
-                        if raw_residue == 2:
-                            return {
-                                (clue_value, COLOR_CLUE, target_index): cards_touched
-                                for clue_value, cards_touched in color_to_cards_touched.items()
-                                if rightmost_uncolored in cards_touched
-                            }
-                        else:
-                            return {
-                                (clue_value, COLOR_CLUE, target_index): cards_touched
-                                for clue_value, cards_touched in color_to_cards_touched.items()
-                                if rightmost_uncolored not in cards_touched
-                            }
-
-        elif num_residues == 3:
-            raise NotImplementedError
-        else:
-            raise NotImplementedError
-
-    def evaluate_clue_score(self, clue_value, clue_type, target_index) -> int:
-        all_cards_touched_by_clue = get_all_touched_cards(
-            clue_type, clue_value, self.variant_name
-        )
-        good_card_indices = [
-            i
-            for i in range(len(self.hands[target_index]))
-            if not self.is_trash_card(self.hands[target_index][i])
-        ]
-        candidates_list = self.all_candidates_list[target_index]
-        score = 1
-
-        for i in good_card_indices:
-            if self.hands[target_index][i].to_tuple() in all_cards_touched_by_clue:
-                new_candidates = candidates_list[i].intersection(
-                    all_cards_touched_by_clue
-                )
-            else:
-                new_candidates = candidates_list[i].difference(
-                    all_cards_touched_by_clue
-                )
-            score *= len(new_candidates)
-
-        return score
-
-    def get_hat_residue(
-        self,
-        clue_giver: int,
-        target_index: int,
-        clue_type: int,
-        clue_value: int,
-        card_orders,
-    ):
-        num_residues = self.num_residues_per_player
-        rightmost_unnumbered = self.get_rightmost_unnumbered_card(target_index)
-        rightmost_uncolored = self.get_rightmost_uncolored_card(target_index)
-
-        clue_mappings = self.get_special_hat_clues(
-            self.variant_name, target_index, clue_mapping_only=True
-        )
-        if clue_mappings is not None:
-            for raw_residue, clue_type_values in clue_mappings.items():
-                for _type, _value in clue_type_values:
-                    if clue_type == _type and clue_value == _value:
-                        return (
-                            raw_residue
-                            + ((target_index - clue_giver - 1) % self.num_players)
-                            * num_residues
-                        )
-
-        if num_residues == 4:
-            if clue_type == RANK_CLUE:
-                if is_brownish_pinkish(self.variant_name):
-                    raw_residue = 0 if clue_value in {1, 3, 5} else 1
-                else:
-                    if rightmost_unnumbered is None:
-                        all_ranks_clued = []
-                        for card in self.hands[target_index]:
-                            all_ranks_clued += self.rank_clued_card_orders[card.order]
-
-                        if clue_value == min(all_ranks_clued):
-                            raw_residue = 0
-                        elif clue_value == max(all_ranks_clued):
-                            raw_residue = 1
-                        else:
-                            raise IndentationError
-                    else:
-                        if rightmost_unnumbered.order in card_orders:
-                            raw_residue = 0
-                        else:
-                            raw_residue = 1
-            elif clue_type == COLOR_CLUE:
-                if is_whiteish_rainbowy(self.variant_name):
-                    num_colors = len(get_available_color_clues(self.variant_name))
-                    if num_colors in {2, 4, 5, 6}:
-                        raw_residue = 2 if clue_value % 2 == 0 else 3
-                    else:
-                        raise NotImplementedError
-                else:
-                    if rightmost_uncolored is None:
-                        all_colors_clued = []
-                        for card in self.hands[target_index]:
-                            all_colors_clued += self.color_clued_card_orders[card.order]
-
-                        if clue_value == min(all_colors_clued):
-                            raw_residue = 2
-                        elif clue_value == max(all_colors_clued):
-                            raw_residue = 3
-                        else:
-                            raise IndentationError
-                    else:
-                        if rightmost_uncolored.order in card_orders:
-                            raw_residue = 2
-                        else:
-                            raw_residue = 3
-            else:
-                raise ImportError
-        elif num_residues == 3:
-            raise NotImplementedError
-        else:
-            raise NotImplementedError
-
-        return (
-            raw_residue
-            + ((target_index - clue_giver - 1) % self.num_players) * num_residues
-        )
+        return self.get_legal_clues_helper(sum_of_residues)
 
     def get_good_actions(self, player_index: int) -> Dict[str, List[int]]:
         all_other_players_cards = self.get_all_other_players_cards(player_index)
@@ -1211,10 +1389,3 @@ class EncoderGameState(GameState):
             "dupe_in_other_hand_or_trash": dupe_in_other_hand_or_trash,
             "seen_in_other_hand": seen_in_other_hand,
         }
-
-    def write_note(self, order: int, note: str, candidates=None, append=True):
-        if order in self.trashy_orders:
-            super().write_note(order=order, note="[kt]", candidates=None, append=append)
-            return
-
-        super().write_note(order=order, note=note, candidates=candidates, append=append)
