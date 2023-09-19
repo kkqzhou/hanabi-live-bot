@@ -904,6 +904,7 @@ class BaseEncoderGameState(GameState):
 class EncoderV1GameState(BaseEncoderGameState):
     def __init__(self, variant_name, player_names, our_player_index):
         super().__init__(variant_name, player_names, our_player_index, get_v1_mod_table)
+        self.ambiguous_residue_orders: Set[int] = set()
 
     def handle_clue(
         self,
@@ -926,55 +927,112 @@ class EncoderV1GameState(BaseEncoderGameState):
                 continue
 
             left_non_hat_clued = self.get_leftmost_non_hat_clued_card(player_index)
+            note_order = None
             if left_non_hat_clued is None:
-                continue
+                other_residue = 0
+                for i in range(len(self.hands[player_index])):
+                    card = self.hands[player_index][-i - 1]
+                    candidates = self.all_candidates_list[player_index][-i - 1]
+                    if card.order in self.ambiguous_residue_orders:
+                        card_res = (
+                            1
+                            + card.suit_index
+                            + (card.rank - 1) * len(SUITS[self.variant_name])
+                        )
+                        other_residue = card_res % self.mod_base
+                        note_order = card.order
+                        new_candidates = candidates.intersection(
+                            {
+                                (suit_index, rank)
+                                for (suit_index, rank) in get_all_cards(
+                                    self.variant_name
+                                )
+                                if (
+                                    1
+                                    + suit_index
+                                    + (rank - 1) * len(SUITS[self.variant_name])
+                                    - other_residue
+                                )
+                                % self.mod_base
+                                == 0
+                            }
+                        )
+                        self.ambiguous_residue_orders.remove(note_order)
+                        break
+            else:
+                other_residue = identity_to_residue[
+                    (left_non_hat_clued.suit_index, left_non_hat_clued.rank)
+                ]
+                _, i = order_to_index[left_non_hat_clued.order]
+                note_order = left_non_hat_clued.order
+                new_candidates = self.all_candidates_list[player_index][i].intersection(
+                    residue_to_identities[other_residue]
+                )
+                if (
+                    len(residue_to_identities[other_residue].difference(self.trash))
+                    >= 3
+                ):
+                    self.ambiguous_residue_orders.add(note_order)
 
-            other_residue = identity_to_residue[
-                (left_non_hat_clued.suit_index, left_non_hat_clued.rank)
-            ]
+            if note_order is not None:
+                if len(new_candidates):
+                    _, note_i = order_to_index[note_order]
+                    self.all_candidates_list[player_index][note_i] = new_candidates
+                    self.write_note(note_order, note="", candidates=new_candidates)
+                    self.hat_clued_card_orders.add(note_order)
+                else:
+                    self.write_note(note_order, note="someone gave a bad hat clue")
+
             print(
-                self.player_names[player_index]
-                + " "
-                + str(left_non_hat_clued)
-                + " has residue "
-                + str(other_residue)
+                f"{self.player_names[player_index]} {left_non_hat_clued}"
+                f" has residue {other_residue}"
             )
             sum_of_others_residues += other_residue
-
-            _, i = order_to_index[left_non_hat_clued.order]
-            new_candidates = self.all_candidates_list[player_index][i].intersection(
-                residue_to_identities[other_residue]
-            )
-            if len(new_candidates):
-                self.all_candidates_list[player_index][i] = new_candidates
-
-                self.write_note(
-                    left_non_hat_clued.order, note="", candidates=new_candidates
-                )
-                self.hat_clued_card_orders.add(left_non_hat_clued.order)
-            else:
-                self.write_note(
-                    left_non_hat_clued.order,
-                    note="someone messed up and gave a bad hat clue",
-                )
 
         if self.our_player_index != clue_giver:
             my_residue = (hat_residue - sum_of_others_residues) % self.mod_base
             print(f"My ({self.our_player_name})) residue = {my_residue}.")
-            print(f"Hat candidates: {residue_to_identities[my_residue]}")
             left_non_hat_clued = self.get_leftmost_non_hat_clued_card(
                 self.our_player_index
             )
             if left_non_hat_clued is not None:
+                print(f"Hat candidates: {residue_to_identities[my_residue]}")
                 _, i = order_to_index[left_non_hat_clued.order]
+                note_order = left_non_hat_clued.order
                 new_candidates = self.all_candidates_list[self.our_player_index][
                     i
                 ].intersection(residue_to_identities[my_residue])
+                if len(residue_to_identities[my_residue].difference(self.trash)) >= 3:
+                    self.ambiguous_residue_orders.add(note_order)
+
                 self.all_candidates_list[self.our_player_index][i] = new_candidates
-                self.write_note(
-                    left_non_hat_clued.order, note="", candidates=new_candidates
-                )
-                self.hat_clued_card_orders.add(left_non_hat_clued.order)
+                self.write_note(note_order, note="", candidates=new_candidates)
+                self.hat_clued_card_orders.add(note_order)
+            else:
+                for i in range(len(self.our_candidates)):
+                    candidates = self.our_candidates[-i - 1]
+                    if self.our_hand[-i - 1].order in self.ambiguous_residue_orders:
+                        fillin_candidates = {
+                            (suit_index, rank)
+                            for (suit_index, rank) in get_all_cards(self.variant_name)
+                            if (
+                                1
+                                + suit_index
+                                + (rank - 1) * len(SUITS[self.variant_name])
+                                - my_residue
+                            )
+                            % self.mod_base
+                            == 0
+                        }
+                        print(f"Fill-in candidates: {fillin_candidates}")
+                        note_order = self.our_hand[-i - 1].order
+                        new_candidates = candidates.intersection(fillin_candidates)
+                        self.all_candidates_list[self.our_player_index][
+                            -i - 1
+                        ] = new_candidates
+                        self.write_note(note_order, note="", candidates=new_candidates)
+                        self.ambiguous_residue_orders.remove(note_order)
+                        break
 
         return super().handle_clue(
             clue_giver, target_index, clue_type, clue_value, card_orders
@@ -989,9 +1047,18 @@ class EncoderV1GameState(BaseEncoderGameState):
                 continue
             lnhc = self.get_leftmost_non_hat_clued_card(player_index)
             if lnhc is None:
-                continue
-
-            sum_of_residues += identity_to_residue[(lnhc.suit_index, lnhc.rank)]
+                for i in range(len(self.hands[player_index])):
+                    card = self.hands[player_index][-i - 1]
+                    if card.order in self.ambiguous_residue_orders:
+                        card_res = (
+                            1
+                            + card.suit_index
+                            + (card.rank - 1) * len(SUITS[self.variant_name])
+                        )
+                        sum_of_residues += card_res % self.mod_base
+                        break
+            else:
+                sum_of_residues += identity_to_residue[(lnhc.suit_index, lnhc.rank)]
 
         sum_of_residues = sum_of_residues % self.mod_base
         return self.get_legal_clues_helper(sum_of_residues)

@@ -90,8 +90,8 @@ if __name__ == "__main__":
     vars = get_missing_vars(
         "yagami_black",
         5,
-        include_dark_suits=False,
-        num_suits=5,
+        include_dark_suits=True,
+        num_suits=6,
         include_substrings=include_substrings,
         exclude_substrings=exclude_substrings,
         shorthand=True,
