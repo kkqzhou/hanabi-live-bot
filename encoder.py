@@ -245,8 +245,8 @@ def get_v1_mod_table(variant_name: str, preferred_modulus=None):
                 11: [(0, -3)],
                 12: [(1, -3)],
                 13: [(2, -3)],
-                14: [(3, -3)],
-                15: [(4, -3)] + [(i, -j) for i in range(5) for j in {4, 5}],
+                14: [(4, -3)],
+                15: [(3, -3)] + [(i, -j) for i in range(5) for j in {4, 5}],
             }
     elif num_suits == 4:
         if preferred_modulus == 12:
@@ -480,7 +480,11 @@ class BaseEncoderGameState(GameState):
             )
             max_crits = max(max_crits, num_crits)
 
-        return max_crits > self.num_cards_in_deck and self.num_cards_in_deck > 0
+        return (
+            max_crits > self.num_cards_in_deck
+            and self.num_cards_in_deck > 0
+            and self.pace >= 0
+        )
 
     @property
     def endgame_stall_condition(self) -> bool:

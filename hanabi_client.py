@@ -651,13 +651,10 @@ class HanabiClient:
             )
             max_crits = max(max_crits, num_crits)
 
-        cannot_play = (
-            max_crits > state.num_cards_in_deck and state.num_cards_in_deck > 0
-        )
-        if cannot_play:
+        if state.cannot_play:
             print(f"CANNOT PLAY! {max_crits} crits > {state.num_cards_in_deck} cards")
 
-        if len(my_good_actions["playable"]) and not cannot_play:
+        if len(my_good_actions["playable"]) and not state.cannot_play:
             # sort playables by lowest possible rank of candidates
             sorted_playables = sorted(
                 my_good_actions["playable"],
@@ -771,10 +768,23 @@ class HanabiClient:
                 self.discard(sorted_playables[0], table_id)
             return
 
-        cannot_yolo = (state.bombs > 1) and (state.pace > state.num_players - 3)
-        if len(my_good_actions["yoloable"]) and not cannot_yolo and not cannot_play:
+        cannot_yolo = (state.bombs > 1) and (state.pace >= 1)
+        if (
+            len(my_good_actions["yoloable"])
+            and not cannot_yolo
+            and not state.cannot_play
+        ):
             self.play(my_good_actions["yoloable"][0], table_id)
             return
+
+        if state.pace < 0 or state.num_cards_in_deck <= 0:
+            for i in range(len(state.our_hand)):
+                order = state.our_hand[-i - 1]
+                candidates = state.our_candidates[-i - 1]
+                if len(candidates.intersection(state.playables)):
+                    print("LAST RESORT PLAY")
+                    self.play(order, table_id)
+                    return
 
         lnhcs = state.get_leftmost_non_hat_clued_cards()
         num_useful_cards = 0
