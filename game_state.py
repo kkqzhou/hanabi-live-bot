@@ -164,7 +164,7 @@ def get_available_color_clues(variant_name: str):
             available_color_clues.append("Teal")
             break
 
-    for color in ["Black", "Pink", "Dark Pink", "Brown", "Dark Brown"]:
+    for color in ["Black", "Pink", "Brown", "Dark Pink", "Dark Brown"]:
         if color in SUITS[variant_name]:
             available_color_clues.append(color)
 
@@ -520,6 +520,7 @@ class GameState:
             Tuple[int, int], int
         ] = {}  # keys are tuples of (suit_index, rank)
         self.turn: int = 0
+        self.max_score: int = 99999
         self.notes: Dict[int, str] = {}
 
     @property
@@ -1047,32 +1048,6 @@ class GameState:
         return get_cards_touched_dict(
             self.variant_name, target_hand, target_index, clue_type_values
         )
-        clue_to_cards_touched = {}
-        available_color_clues = get_available_color_clues(self.variant_name)
-        available_rank_clues = get_available_rank_clues(self.variant_name)
-        for clue_type, clue_value in clue_type_values:
-            # prevent illegal clues from being given
-            if clue_type == COLOR_CLUE and clue_value >= len(available_color_clues):
-                continue
-            if clue_type == RANK_CLUE and clue_value not in available_rank_clues:
-                continue
-
-            cards_touched = get_all_touched_cards(
-                clue_type, clue_value, self.variant_name
-            )
-            cards_touched_in_target_hand = [
-                card
-                for card in target_hand
-                if (card.suit_index, card.rank) in cards_touched
-            ]
-            if len(cards_touched_in_target_hand):
-                clue_to_cards_touched[
-                    (clue_type, clue_value)
-                ] = cards_touched_in_target_hand
-        return {
-            (clue_value, clue_type, target_index): cards_touched
-            for (clue_type, clue_value), cards_touched in clue_to_cards_touched.items()
-        }
 
     def get_good_actions(self, player_index: int) -> Dict[str, List[int]]:
         raise NotImplementedError

@@ -25,6 +25,7 @@ class HanabiClient:
         bot_to_join: str,
         convention: str,
         disconnect_on_game_end: bool,
+        table_name: str,
     ):
         self.bot_to_join = bot_to_join
         self.convention_name = (
@@ -36,6 +37,7 @@ class HanabiClient:
             "hgroup": HGroupGameState,
         }[self.convention_name]
         self.disconnect_on_game_end = disconnect_on_game_end
+        self.table_name = table_name
 
         # Initialize all class variables
         self.commandHandlers = {}
@@ -233,7 +235,7 @@ class HanabiClient:
     def chat_create_table(self):
         self.send(
             "tableCreate",
-            {"name": f"encoder", "maxPlayers": 5},
+            {"name": self.table_name, "maxPlayers": 5},
         )
 
     def chat_set_variant(self, variant_name: str):
@@ -408,6 +410,7 @@ class HanabiClient:
 
         elif data["type"] == "status":
             state.clue_tokens = data["clues"]
+            state.max_score = data["maxScore"]
 
         elif data["type"] == "gameOver":
             if self.disconnect_on_game_end:
@@ -632,6 +635,10 @@ class HanabiClient:
         self.clue(state.next_player_index, RANK_CLUE, burn_clue_card.rank, table_id)
 
     def encoder_v1(self, state: EncoderV1GameState, table_id: int):
+        if state.pace < 0 or state.max_score < 5 * len(state.stacks):
+            self.play(state.our_hand[-1].order, table_id)
+            return
+
         # TODO: implement elim
         good_actions = {
             player_index: state.get_good_actions(player_index)

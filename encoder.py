@@ -191,9 +191,9 @@ def get_v1_mod_table(variant_name: str, preferred_modulus=None):
                 10: [(4, -2)],
                 11: [(5, -2)],
                 12: [(0, -3), (1, -3)],
-                13: [(2, -3), (3, -3)],
-                14: [(4, -3), (5, -3)],
-                15: [(i, -j) for i in range(6) for j in {4, 5}],
+                13: [(2, -3), (4, -3)],
+                14: [(5, -3)],
+                15: [(3, -3)] + [(i, -j) for i in range(6) for j in {4, 5}],
             }
     elif num_suits == 5:
         if preferred_modulus == 12:

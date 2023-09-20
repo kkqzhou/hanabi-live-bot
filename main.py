@@ -68,7 +68,8 @@ def run(username, bot_to_join):
 
     convention = config["convention"]
     disconnect_on_game_end = config["disconnect_on_game_end"]
-    HanabiClient(ws_url, cookie, bot_to_join, convention, disconnect_on_game_end)
+    table_name = config.get("table_name", "bots")
+    HanabiClient(ws_url, cookie, bot_to_join, convention, disconnect_on_game_end, table_name)
 
 
 if __name__ == "__main__":

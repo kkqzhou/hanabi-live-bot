@@ -115,6 +115,14 @@ def test_get_available_color_clues():
         "Dual-Color & Pink (4 Suits)": ["Red", "Yellow", "Blue", "Pink"],
         "Dual-Color Mix": ["Red", "Yellow", "Blue", "Black"],
         "Ambiguous & Dual-Color": ["Red", "Yellow", "Blue"],
+        "Brown & Dark Pink (6 Suits)": [
+            "Red",
+            "Yellow",
+            "Green",
+            "Blue",
+            "Brown",
+            "Dark Pink",
+        ],
     }
     run_simple_test(game_state.get_available_color_clues, tests)
 
