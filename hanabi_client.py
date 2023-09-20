@@ -635,6 +635,7 @@ class HanabiClient:
         self.clue(state.next_player_index, RANK_CLUE, burn_clue_card.rank, table_id)
 
     def encoder_v1(self, state: EncoderV1GameState, table_id: int):
+        # ragequit
         if state.pace < 0 or state.max_score < 5 * len(state.stacks):
             self.play(state.our_hand[-1].order, table_id)
             return
@@ -669,6 +670,7 @@ class HanabiClient:
             )
             num_crits_i_have = sum([state.is_critical(x) for x in state.our_candidates])
 
+            # TODO: clean this up and put this into the encoder game state
             # priority 0
             fk_orders = state.get_fully_known_card_orders(
                 state.our_player_index, keyed_on_order=True
@@ -682,10 +684,19 @@ class HanabiClient:
                         identity not in state.criticals
                         and num_crits_i_have > state.num_cards_in_deck
                     )
+                    duped_in_another_hand = (
+                        order in my_good_actions["dupe_in_other_hand"]
+                    )
                     if dire_circumstances:
                         print(f"Would love to play {identity} but cannot")
+                    elif duped_in_another_hand:
+                        print(f"Not playing {identity} prio 0 when duped in other hand")
 
-                    if next_playable in all_others_hc_cards and not dire_circumstances:
+                    if (
+                        next_playable in all_others_hc_cards
+                        and not dire_circumstances
+                        and not duped_in_another_hand
+                    ):
                         print("PRIO 0")
                         self.play(order, table_id)
                         return

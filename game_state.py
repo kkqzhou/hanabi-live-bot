@@ -605,6 +605,10 @@ class GameState:
         )
 
     @property
+    def num_dark_suits(self) -> int:
+        return len([x for x in SUITS[self.variant_name] if x in DARK_SUIT_NAMES])
+
+    @property
     def our_hand(self) -> List[Card]:
         return self.hands[self.our_player_index]
 

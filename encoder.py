@@ -2,6 +2,7 @@ from game_state import (
     Card,
     GameState,
     SUITS,
+    DARK_SUIT_NAMES,
     get_all_cards,
     RANK_CLUE,
     COLOR_CLUE,
@@ -157,6 +158,7 @@ def get_v1_mod_table(variant_name: str, preferred_modulus=None):
     # playable is marked as (-1, 0)
     # stack x + n is marked as (x, -n)
     num_suits = len(SUITS[variant_name])
+    dark_suits = [x for x in SUITS[variant_name] if x in DARK_SUIT_NAMES]
     if num_suits == 6:
         if preferred_modulus == 15:
             mod_table = {
@@ -177,24 +179,44 @@ def get_v1_mod_table(variant_name: str, preferred_modulus=None):
                 14: [(i, -j) for i in range(6) for j in {4, 5}],
             }
         elif preferred_modulus == 16:
-            mod_table = {
-                0: [(0, 0)],
-                1: [(0, -1)],
-                2: [(1, -1)],
-                3: [(2, -1)],
-                4: [(3, -1)],
-                5: [(4, -1)],
-                6: [(5, -1)],
-                7: [(0, -2), (1, -2)],
-                8: [(2, -2)],
-                9: [(3, -2)],
-                10: [(4, -2)],
-                11: [(5, -2)],
-                12: [(0, -3), (1, -3)],
-                13: [(2, -3), (4, -3)],
-                14: [(5, -3)],
-                15: [(3, -3)] + [(i, -j) for i in range(6) for j in {4, 5}],
-            }
+            if len(dark_suits) == 2:
+                mod_table = {
+                    0: [(0, 0)],
+                    1: [(0, -1)],
+                    2: [(1, -1)],
+                    3: [(2, -1)],
+                    4: [(3, -1)],
+                    5: [(4, -1), (5, -1)],
+                    6: [(0, -2), (1, -2)],
+                    7: [(2, -2)],
+                    8: [(3, -2)],
+                    9: [(4, -2)],
+                    10: [(5, -2)],
+                    11: [(0, -3), (1, -3)],
+                    12: [(2, -3), (3, -3)],
+                    13: [(4, -3)],
+                    14: [(5, -3)],
+                    15: [(i, -j) for i in range(6) for j in {4, 5}],
+                }
+            else:
+                mod_table = {
+                    0: [(0, 0)],
+                    1: [(0, -1)],
+                    2: [(1, -1)],
+                    3: [(2, -1)],
+                    4: [(3, -1)],
+                    5: [(4, -1)],
+                    6: [(5, -1)],
+                    7: [(0, -2), (1, -2)],
+                    8: [(2, -2)],
+                    9: [(3, -2)],
+                    10: [(4, -2)],
+                    11: [(5, -2)],
+                    12: [(0, -3), (1, -3)],
+                    13: [(2, -3), (4, -3)],
+                    14: [(5, -3)],
+                    15: [(3, -3)] + [(i, -j) for i in range(6) for j in {4, 5}],
+                }
     elif num_suits == 5:
         if preferred_modulus == 12:
             mod_table = {
@@ -208,8 +230,8 @@ def get_v1_mod_table(variant_name: str, preferred_modulus=None):
                 7: [(2, -2), (3, -2)],
                 8: [(4, -2)],
                 9: [(0, -3), (1, -3)],
-                10: [(2, -3), (3, -3)],
-                11: [(4, -3)] + [(i, -j) for i in range(5) for j in {4, 5}],
+                10: [(2, -3)],
+                11: [(3, -3), (4, -3)] + [(i, -j) for i in range(5) for j in {4, 5}],
             }
         elif preferred_modulus == 15:
             mod_table = {
@@ -1069,8 +1091,8 @@ class EncoderV1GameState(BaseEncoderGameState):
 
     def get_good_actions(self, player_index: int) -> Dict[str, List[int]]:
         all_other_players_cards = self.get_all_other_players_cards(player_index)
-        all_op_unknown_hat_clued_cards = self.get_all_other_players_hat_clued_cards(
-            player_index, no_singletons=True
+        all_op_hat_clued_cards = self.get_all_other_players_hat_clued_cards(
+            player_index, no_singletons=False
         )
         hand = self.hands[player_index]
         candidates_list = self.all_candidates_list[player_index]
@@ -1108,11 +1130,10 @@ class EncoderV1GameState(BaseEncoderGameState):
                 dupe_in_own_hand += orders[1:]
 
         for i, candidates in enumerate(candidates_list):
-            # only count unknown hat clued cards for the purposes of determining "dupedness"
-            if not len(candidates.difference(all_op_unknown_hat_clued_cards)):
+            if not len(candidates.difference(all_op_hat_clued_cards)):
                 dupe_in_other_hand.append(hand[i].order)
             elif not len(
-                candidates.difference(all_op_unknown_hat_clued_cards.union(self.trash))
+                candidates.difference(all_op_hat_clued_cards.union(self.trash))
             ):
                 dupe_in_other_hand_or_trash.append(hand[i].order)
             elif not len(candidates.difference(all_other_players_cards)):
