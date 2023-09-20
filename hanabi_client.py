@@ -634,7 +634,7 @@ class HanabiClient:
             burn_clue_card = state.hands[state.next_player_index][0]
         self.clue(state.next_player_index, RANK_CLUE, burn_clue_card.rank, table_id)
 
-    def encoder_v1(self, state: EncoderV1GameState, table_id: int):
+    def encoder_v2(self, state: EncoderV2GameState, table_id: int):
         # ragequit
         if state.pace < 0 or state.max_score < 5 * len(state.stacks):
             self.play(state.our_hand[-1].order, table_id)
@@ -930,7 +930,7 @@ class HanabiClient:
                     self.play(state.our_hand[i].order, table_id)
                     return
 
-    def encoder_v2(self, state: EncoderV2GameState, table_id: int):
+    def encoder_v1(self, state: EncoderV1GameState, table_id: int):
         # TODO: implement elim
         good_actions = {
             player_index: state.get_good_actions(player_index)

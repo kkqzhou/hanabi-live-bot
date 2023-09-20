@@ -17,7 +17,7 @@ from typing import Callable, Dict, List, Set, Optional, Tuple
 from copy import deepcopy
 
 
-def get_playful_mod_table(variant_name: str, preferred_modulus=None):
+def get_v1_mod_table(variant_name: str, preferred_modulus=None):
     # trash is marked as (0, 0)
     # playable is marked as (-1, 0)
     # stack x + n is marked as (x, -n)
@@ -153,7 +153,7 @@ def get_playful_mod_table(variant_name: str, preferred_modulus=None):
     return mod_table
 
 
-def get_v1_mod_table(variant_name: str, preferred_modulus=None):
+def get_v2_mod_table(variant_name: str, preferred_modulus=None):
     # trash is marked as (0, 0)
     # playable is marked as (-1, 0)
     # stack x + n is marked as (x, -n)
@@ -927,9 +927,9 @@ class BaseEncoderGameState(GameState):
         super().write_note(order=order, note=note, candidates=candidates, append=append)
 
 
-class EncoderV1GameState(BaseEncoderGameState):
+class EncoderV2GameState(BaseEncoderGameState):
     def __init__(self, variant_name, player_names, our_player_index):
-        super().__init__(variant_name, player_names, our_player_index, get_v1_mod_table)
+        super().__init__(variant_name, player_names, our_player_index, get_v2_mod_table)
         self.ambiguous_residue_orders: Set[int] = set()
 
     def handle_clue(
@@ -1150,11 +1150,9 @@ class EncoderV1GameState(BaseEncoderGameState):
         }
 
 
-class EncoderV2GameState(BaseEncoderGameState):
+class EncoderV1GameState(BaseEncoderGameState):
     def __init__(self, variant_name, player_names, our_player_index):
-        super().__init__(
-            variant_name, player_names, our_player_index, get_playful_mod_table
-        )
+        super().__init__(variant_name, player_names, our_player_index, get_v1_mod_table)
         self.superpositions: Dict[int, SuperPosition] = {}  # order -> SuperPosition
         self.identities_called_to_play: Set[Tuple[int, int]] = set()
         self.play_order_queue: List[int] = []

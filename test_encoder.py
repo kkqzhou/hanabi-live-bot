@@ -1,4 +1,4 @@
-from encoder import BaseEncoderGameState, EncoderV2GameState
+from encoder import BaseEncoderGameState, EncoderV1GameState
 from game_state import RANK_CLUE, COLOR_CLUE, get_all_touched_cards, SUITS, Card
 from test_functions import check_eq
 from test_game_state import create_game_states, get_deck_from_tuples
@@ -160,8 +160,8 @@ def test_evaluate_clue_score():
         ]
     )
     # fmt: on
-    STATES_5P: Dict[int, EncoderV2GameState] = create_game_states(
-        5, variant_name, game_state_cls=EncoderV2GameState, deck=deck
+    STATES_5P: Dict[int, EncoderV1GameState] = create_game_states(
+        5, variant_name, game_state_cls=EncoderV1GameState, deck=deck
     )
     STATES_5P[0].stacks = [2, 1, 1, 0, 0]
     check_eq(STATES_5P[0].evaluate_clue_score(2, RANK_CLUE, 4), 8)
@@ -181,8 +181,8 @@ def test_superposition():
         ["r1", "y1", "g1", "o5"],
         ["r1", "g1", "y1", "o1"],
     ]
-    STATES_5P: Dict[int, EncoderV2GameState] = construct_test_state(
-        "Omni (5 Suits)", hand_strs, EncoderV2GameState
+    STATES_5P: Dict[int, EncoderV1GameState] = construct_test_state(
+        "Omni (5 Suits)", hand_strs, EncoderV1GameState
     )
 
     give_hat_clue(STATES_5P, 0)
@@ -294,8 +294,8 @@ def test_superposition2():
         ["b3", "p2", "y3", "p4"],
         ["g1", "g1", "g1", "g4"],
     ]
-    STATES_5P: Dict[int, EncoderV2GameState] = construct_test_state(
-        "No Variant", hand_strs, EncoderV2GameState
+    STATES_5P: Dict[int, EncoderV1GameState] = construct_test_state(
+        "No Variant", hand_strs, EncoderV1GameState
     )
 
     give_clue(STATES_5P, 0, RANK_CLUE, 3, 1)
@@ -331,8 +331,8 @@ def test_superposition3():
         ["r2", "r1", "g1", "y1"],
         ["i1", "r1", "g3", "r3"],
     ]
-    STATES_5P: Dict[int, EncoderV2GameState] = construct_test_state(
-        "Prism (5 Suits)", hand_strs, EncoderV2GameState
+    STATES_5P: Dict[int, EncoderV1GameState] = construct_test_state(
+        "Prism (5 Suits)", hand_strs, EncoderV1GameState
     )
 
     give_clue(STATES_5P, 0, RANK_CLUE, 1, 3)  # t1
@@ -360,8 +360,8 @@ def test_superposition4():
         ["g1", "r3", "i1", "y1"],
         ["y2", "y3", "r4", "y4"],
     ]
-    STATES_5P: Dict[int, EncoderV2GameState] = construct_test_state(
-        "Prism (5 Suits)", hand_strs, EncoderV2GameState
+    STATES_5P: Dict[int, EncoderV1GameState] = construct_test_state(
+        "Prism (5 Suits)", hand_strs, EncoderV1GameState
     )
 
     give_clue(STATES_5P, 0, RANK_CLUE, 1, 1)  # t1
@@ -402,8 +402,8 @@ def test_superpositionx():
         ["y5", "b5", "g4", "r3"],
         ["g1", "b4", "g1", "y2"],
     ]
-    STATES_5P: Dict[int, EncoderV2GameState] = construct_test_state(
-        "Prism (5 Suits)", hand_strs, EncoderV2GameState
+    STATES_5P: Dict[int, EncoderV1GameState] = construct_test_state(
+        "Prism (5 Suits)", hand_strs, EncoderV1GameState
     )
     give_clue(STATES_5P, 0, COLOR_CLUE, 0, 3)
     play_draw(STATES_5P, 7, 20, 3, 2)
@@ -440,8 +440,8 @@ def test_superposition5():
         ["b3", "y3", "r4", "g1"],
         ["b2", "b4", "b2", "b4"],
     ]
-    STATES_5P: Dict[int, EncoderV2GameState] = construct_test_state(
-        "Prism (5 Suits)", hand_strs, EncoderV2GameState
+    STATES_5P: Dict[int, EncoderV1GameState] = construct_test_state(
+        "Prism (5 Suits)", hand_strs, EncoderV1GameState
     )
     give_clue(STATES_5P, 0, RANK_CLUE, 3, 3)
     play_draw(STATES_5P, 7, 20, 2, 4)
@@ -479,8 +479,8 @@ def test_superposition6():
         ["k2", "p1", "p2", "g4"],
         ["p3", "r4", "b1", "b1"],
     ]
-    STATES_5P: Dict[int, EncoderV2GameState] = construct_test_state(
-        "Black (6 Suits)", hand_strs, EncoderV2GameState
+    STATES_5P: Dict[int, EncoderV1GameState] = construct_test_state(
+        "Black (6 Suits)", hand_strs, EncoderV1GameState
     )
 
     give_clue(STATES_5P, 0, COLOR_CLUE, 5, 1)
