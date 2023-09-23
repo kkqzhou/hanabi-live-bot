@@ -775,6 +775,11 @@ class HanabiClient:
                             self.play(playable_order, table_id)
                             return
 
+                        if card.order in state.ambiguous_residue_orders:
+                            print("THIS CARD IS IN AMB CARD ORDERS, WILL BE RESOLVED")
+                            self.play(playable_order, table_id)
+                            return
+
             if state.pace <= state.num_players - 2:
                 print("PACE IS TOO LOW, NEED TO PLAY!!!")
                 self.play(sorted_playables[0], table_id)

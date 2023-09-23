@@ -338,10 +338,10 @@ def get_special_hat_clues_dict(variant_name: str):
     all_oe_vars = [var for var in SUITS if "Odds and Evens" in var]
     base_dct = {
         var: {
-            0: [(RANK_CLUE, 5), (RANK_CLUE, 1)],
-            1: [(COLOR_CLUE, 0), (RANK_CLUE, 2)],
-            2: [(COLOR_CLUE, 1), (RANK_CLUE, 3)],
-            3: [(COLOR_CLUE, 2), (RANK_CLUE, 4)],
+            0: [(COLOR_CLUE, 0), (RANK_CLUE, 2)],
+            1: [(COLOR_CLUE, 1), (RANK_CLUE, 3)],
+            2: [(COLOR_CLUE, 2), (RANK_CLUE, 4)],
+            3: [(RANK_CLUE, 5), (RANK_CLUE, 1)],
         }
         for var in all_3color_wr_vars
     }
@@ -932,6 +932,29 @@ class EncoderV2GameState(BaseEncoderGameState):
         super().__init__(variant_name, player_names, our_player_index, get_v2_mod_table)
         self.ambiguous_residue_orders: Set[int] = set()
 
+    def get_hat_clue_target(self, player_index) -> Tuple[Optional[Card], bool]:
+        # return_type: (card, is_in_ambiguous_orders)
+        left_non_hat_clued = self.get_leftmost_non_hat_clued_card(player_index)
+
+        if 0.3 <= self.score_pct < 0.6:
+            for i in range(len(self.hands[player_index])):
+                card = self.hands[player_index][-i - 1]
+                if card.order in self.ambiguous_residue_orders:
+                    return card, True
+
+            if left_non_hat_clued is not None:
+                return left_non_hat_clued, False
+        else:
+            if left_non_hat_clued is not None:
+                return left_non_hat_clued, False
+
+            for i in range(len(self.hands[player_index])):
+                card = self.hands[player_index][-i - 1]
+                if card.order in self.ambiguous_residue_orders:
+                    return card, True
+
+        return None, False
+
     def handle_clue(
         self,
         clue_giver: int,
@@ -952,113 +975,108 @@ class EncoderV2GameState(BaseEncoderGameState):
             if player_index in {self.our_player_index, clue_giver}:
                 continue
 
-            left_non_hat_clued = self.get_leftmost_non_hat_clued_card(player_index)
-            note_order = None
-            if left_non_hat_clued is None:
-                other_residue = 0
-                for i in range(len(self.hands[player_index])):
-                    card = self.hands[player_index][-i - 1]
-                    candidates = self.all_candidates_list[player_index][-i - 1]
-                    if card.order in self.ambiguous_residue_orders:
-                        card_res = (
-                            1
-                            + card.suit_index
-                            + (card.rank - 1) * len(SUITS[self.variant_name])
-                        )
-                        other_residue = card_res % self.mod_base
-                        note_order = card.order
-                        new_candidates = candidates.intersection(
-                            {
-                                (suit_index, rank)
-                                for (suit_index, rank) in get_all_cards(
-                                    self.variant_name
-                                )
-                                if (
-                                    1
-                                    + suit_index
-                                    + (rank - 1) * len(SUITS[self.variant_name])
-                                    - other_residue
-                                )
-                                % self.mod_base
-                                == 0
-                            }
-                        )
-                        self.ambiguous_residue_orders.remove(note_order)
-                        break
-            else:
-                other_residue = identity_to_residue[
-                    (left_non_hat_clued.suit_index, left_non_hat_clued.rank)
-                ]
-                _, i = order_to_index[left_non_hat_clued.order]
-                note_order = left_non_hat_clued.order
-                new_candidates = self.all_candidates_list[player_index][i].intersection(
-                    residue_to_identities[other_residue]
-                )
-                if (
-                    len(residue_to_identities[other_residue].difference(self.trash))
-                    >= 3
-                ):
-                    self.ambiguous_residue_orders.add(note_order)
+            hat_clue_target, is_ambig = self.get_hat_clue_target(player_index)
+            if hat_clue_target is None:
+                continue
 
-            if note_order is not None:
-                if len(new_candidates):
-                    _, note_i = order_to_index[note_order]
-                    self.all_candidates_list[player_index][note_i] = new_candidates
-                    self.write_note(note_order, note="", candidates=new_candidates)
-                    self.hat_clued_card_orders.add(note_order)
-                else:
-                    self.write_note(note_order, note="someone gave a bad hat clue")
-
-            print(
-                f"{self.player_names[player_index]} {left_non_hat_clued}"
-                f" has residue {other_residue}"
-            )
-            sum_of_others_residues += other_residue
-
-        if self.our_player_index != clue_giver:
-            my_residue = (hat_residue - sum_of_others_residues) % self.mod_base
-            print(f"My ({self.our_player_name})) residue = {my_residue}.")
-            left_non_hat_clued = self.get_leftmost_non_hat_clued_card(
-                self.our_player_index
-            )
-            if left_non_hat_clued is not None:
-                print(f"Hat candidates: {residue_to_identities[my_residue]}")
-                _, i = order_to_index[left_non_hat_clued.order]
-                note_order = left_non_hat_clued.order
-                new_candidates = self.all_candidates_list[self.our_player_index][
-                    i
-                ].intersection(residue_to_identities[my_residue])
-                if len(residue_to_identities[my_residue].difference(self.trash)) >= 3:
-                    self.ambiguous_residue_orders.add(note_order)
-
-                self.all_candidates_list[self.our_player_index][i] = new_candidates
-                self.write_note(note_order, note="", candidates=new_candidates)
-                self.hat_clued_card_orders.add(note_order)
-            else:
-                for i in range(len(self.our_candidates)):
-                    candidates = self.our_candidates[-i - 1]
-                    if self.our_hand[-i - 1].order in self.ambiguous_residue_orders:
-                        fillin_candidates = {
+            _, i = order_to_index[hat_clue_target.order]
+            candidates = self.all_candidates_list[player_index][i]
+            if is_ambig:
+                other_res = 0
+                if hat_clue_target.order in self.ambiguous_residue_orders:
+                    card_res = (
+                        1
+                        + hat_clue_target.suit_index
+                        + (hat_clue_target.rank - 1) * len(SUITS[self.variant_name])
+                    )
+                    other_res = card_res % self.mod_base
+                    new_candidates = candidates.intersection(
+                        {
                             (suit_index, rank)
                             for (suit_index, rank) in get_all_cards(self.variant_name)
                             if (
                                 1
                                 + suit_index
                                 + (rank - 1) * len(SUITS[self.variant_name])
-                                - my_residue
+                                - other_res
                             )
                             % self.mod_base
                             == 0
                         }
-                        print(f"Fill-in candidates: {fillin_candidates}")
-                        note_order = self.our_hand[-i - 1].order
-                        new_candidates = candidates.intersection(fillin_candidates)
-                        self.all_candidates_list[self.our_player_index][
-                            -i - 1
-                        ] = new_candidates
-                        self.write_note(note_order, note="", candidates=new_candidates)
-                        self.ambiguous_residue_orders.remove(note_order)
-                        break
+                    )
+                    self.ambiguous_residue_orders.remove(hat_clue_target.order)
+            else:
+                other_res = identity_to_residue[hat_clue_target.to_tuple()]
+                new_candidates = candidates.intersection(
+                    residue_to_identities[other_res]
+                )
+                if len(residue_to_identities[other_res].difference(self.trash)) >= 3:
+                    self.ambiguous_residue_orders.add(hat_clue_target.order)
+
+            if len(new_candidates):
+                self.all_candidates_list[player_index][i] = new_candidates
+                note = f" ({other_res})"
+                if hat_clue_target.order in self.ambiguous_residue_orders:
+                    note += " [?]"
+                self.write_note(
+                    hat_clue_target.order, note=note, candidates=new_candidates
+                )
+                self.hat_clued_card_orders.add(hat_clue_target.order)
+            else:
+                self.write_note(
+                    hat_clue_target.order, note="someone gave a bad hat clue"
+                )
+
+            player_name = self.player_names[player_index]
+            print(f"{player_name} {hat_clue_target} has residue {other_res}")
+            sum_of_others_residues += other_res
+
+        if self.our_player_index != clue_giver:
+            my_residue = (hat_residue - sum_of_others_residues) % self.mod_base
+            print(f"My ({self.our_player_name})) residue = {my_residue}.")
+            my_hat_target, my_is_ambig = self.get_hat_clue_target(self.our_player_index)
+            if my_hat_target is None:
+                return super().handle_clue(
+                    clue_giver, target_index, clue_type, clue_value, card_orders
+                )
+
+            _, my_i = order_to_index[my_hat_target.order]
+            my_candidates = self.our_candidates[my_i]
+            if my_is_ambig:
+                fillin_candidates = {
+                    (suit_index, rank)
+                    for (suit_index, rank) in get_all_cards(self.variant_name)
+                    if (
+                        1
+                        + suit_index
+                        + (rank - 1) * len(SUITS[self.variant_name])
+                        - my_residue
+                    )
+                    % self.mod_base
+                    == 0
+                }
+                print(f"Fill-in candidates: {fillin_candidates}")
+                new_candidates = my_candidates.intersection(fillin_candidates)
+                self.ambiguous_residue_orders.remove(my_hat_target.order)
+            else:
+                print(f"Hat candidates: {residue_to_identities[my_residue]}")
+                new_candidates = my_candidates.intersection(
+                    residue_to_identities[my_residue]
+                )
+                if len(residue_to_identities[my_residue].difference(self.trash)) >= 3:
+                    self.ambiguous_residue_orders.add(my_hat_target.order)
+
+            if len(new_candidates):
+                self.all_candidates_list[self.our_player_index][my_i] = new_candidates
+                note = f" ({my_residue})"
+                if my_hat_target.order in self.ambiguous_residue_orders:
+                    note += " [?]"
+                self.write_note(
+                    my_hat_target.order, note=note, candidates=new_candidates
+                )
+                self.hat_clued_card_orders.add(my_hat_target.order)
+            else:
+                self.write_note(my_hat_target.order, note="someone gave a bad hat clue")
 
         return super().handle_clue(
             clue_giver, target_index, clue_type, clue_value, card_orders
@@ -1071,20 +1089,20 @@ class EncoderV2GameState(BaseEncoderGameState):
         for player_index, hand in self.hands.items():
             if player_index == self.our_player_index:
                 continue
-            lnhc = self.get_leftmost_non_hat_clued_card(player_index)
-            if lnhc is None:
-                for i in range(len(self.hands[player_index])):
-                    card = self.hands[player_index][-i - 1]
-                    if card.order in self.ambiguous_residue_orders:
-                        card_res = (
-                            1
-                            + card.suit_index
-                            + (card.rank - 1) * len(SUITS[self.variant_name])
-                        )
-                        sum_of_residues += card_res % self.mod_base
-                        break
+
+            hat_target, is_ambig = self.get_hat_clue_target(player_index)
+            if hat_target is None:
+                continue
+
+            if is_ambig:
+                card_res = (
+                    1
+                    + hat_target.suit_index
+                    + (hat_target.rank - 1) * len(SUITS[self.variant_name])
+                )
+                sum_of_residues += card_res % self.mod_base
             else:
-                sum_of_residues += identity_to_residue[(lnhc.suit_index, lnhc.rank)]
+                sum_of_residues += identity_to_residue[hat_target.to_tuple()]
 
         sum_of_residues = sum_of_residues % self.mod_base
         return self.get_legal_clues_helper(sum_of_residues)
