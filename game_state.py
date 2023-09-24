@@ -88,7 +88,7 @@ print(SUITS["Candy Corn Mix (6 Suits)"])
 """
 
 
-def get_available_color_clues(variant_name: str):
+def get_available_color_clues(variant_name: str) -> List[str]:
     available_color_clues = []
     # TODO: confirm the following:
     # Mahogany D, Cardinal D, Navy D, Tan D, AD suits
@@ -690,13 +690,19 @@ class GameState:
             and x.order not in self.rank_clued_card_orders
         ]
 
-    def get_all_other_players_cards(self, player_index=None) -> Set[Tuple[int, int]]:
-        return {
-            (c.suit_index, c.rank)
-            for pindex, hand in self.hands.items()
-            for c in hand
-            if pindex not in {self.our_player_index, player_index}
-        }
+    def get_all_other_players_cards(
+        self, player_index=None
+    ) -> Dict[Tuple[int, int], int]:
+        result = {}
+        for pindex, hand in self.hands.items():
+            if pindex in {self.our_player_index, player_index}:
+                continue
+
+            for c in hand:
+                if c.to_tuple() not in result:
+                    result[c.to_tuple()] = 0
+                result[c.to_tuple()] += 1
+        return result
 
     def get_all_other_players_clued_cards(
         self, player_index=None
@@ -993,13 +999,8 @@ class GameState:
             clue_giver, target_index, clue_type, clue_value, card_orders
         )
 
-    def handle_clue(
-        self,
-        clue_giver: int,
-        target_index: int,
-        clue_type: int,
-        clue_value: int,
-        card_orders,
+    def process_pos_neg_clues(
+        self, target_index: int, clue_type: int, clue_value: int, card_orders
     ):
         all_cards_touched_by_clue = get_all_touched_cards(
             clue_type, clue_value, self.variant_name
@@ -1032,7 +1033,9 @@ class GameState:
                     candidates_list[i] = new_possibilities
                 else:
                     candidates_list[i] = new_candidates
+        return touched_cards
 
+    def track_clued_cards(self, clue_type: int, clue_value: int, card_orders):
         for order in card_orders:
             if clue_type == RANK_CLUE:
                 if order not in self.rank_clued_card_orders:
@@ -1043,6 +1046,18 @@ class GameState:
                     self.color_clued_card_orders[order] = []
                 self.color_clued_card_orders[order].append(clue_value)
 
+    def handle_clue(
+        self,
+        clue_giver: int,
+        target_index: int,
+        clue_type: int,
+        clue_value: int,
+        card_orders,
+    ):
+        touched_cards = self.process_pos_neg_clues(
+            target_index, clue_type, clue_value, card_orders
+        )
+        self.track_clued_cards(clue_type, clue_value, card_orders)
         return touched_cards
 
     def get_cards_touched_dict(

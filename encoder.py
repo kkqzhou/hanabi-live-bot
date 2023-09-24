@@ -207,15 +207,16 @@ def get_v2_mod_table(variant_name: str, preferred_modulus=None):
                     4: [(3, -1)],
                     5: [(4, -1)],
                     6: [(5, -1)],
-                    7: [(0, -2), (1, -2)],
-                    8: [(2, -2)],
-                    9: [(3, -2)],
-                    10: [(4, -2)],
-                    11: [(5, -2)],
-                    12: [(0, -3), (1, -3)],
-                    13: [(2, -3), (4, -3)],
-                    14: [(5, -3)],
-                    15: [(3, -3)] + [(i, -j) for i in range(6) for j in {4, 5}],
+                    7: [(0, -2)],
+                    8: [(1, -2)],
+                    9: [(2, -2)],
+                    10: [(3, -2)],
+                    11: [(4, -2)],
+                    12: [(5, -2)],
+                    13: [(0, -3), (1, -3)],
+                    14: [(4, -3), (5, -3)],
+                    15: [(2, -3), (3, -3)]
+                    + [(i, -j) for i in range(6) for j in {4, 5}],
                 }
     elif num_suits == 5:
         if preferred_modulus == 12:
@@ -647,6 +648,25 @@ class BaseEncoderGameState(GameState):
             else None
         )
 
+    def get_all_possible_clues_dict(
+        self,
+    ) -> Dict[Tuple[int, int, int], Set[Tuple[int, int]]]:
+        all_possible_clues_dict = {}
+        for target_index in range(self.num_players):
+            if target_index == self.our_player_index:
+                continue
+
+            clue_type_values = [
+                (RANK_CLUE, cv) for cv in get_available_rank_clues(self.variant_name)
+            ] + [
+                (COLOR_CLUE, cv)
+                for cv in range(len(get_available_color_clues(self.variant_name)))
+            ]
+            all_possible_clues_dict.update(
+                self.get_cards_touched_dict(target_index, clue_type_values)
+            )
+        return all_possible_clues_dict
+
     def get_legal_clues_helper(
         self, sum_of_residues: int
     ) -> Dict[Tuple[int, int, int], Set[Tuple[int, int]]]:
@@ -932,6 +952,10 @@ class EncoderV2GameState(BaseEncoderGameState):
         super().__init__(variant_name, player_names, our_player_index, get_v2_mod_table)
         self.ambiguous_residue_orders: Set[int] = set()
 
+    @property
+    def should_interpret_hat_clue(self) -> bool:
+        return self.clue_tokens < 8
+
     def get_hat_clue_target(self, player_index) -> Tuple[Optional[Card], bool]:
         # return_type: (card, is_in_ambiguous_orders)
         left_non_hat_clued = self.get_leftmost_non_hat_clued_card(player_index)
@@ -955,6 +979,44 @@ class EncoderV2GameState(BaseEncoderGameState):
 
         return None, False
 
+    def get_nonglobal_candidates(self, player_index, identities, new_candidates):
+        nonglobal_candidates = set()
+        player_singletons = [
+            list(self.all_candidates_list[player_index][i])[0]
+            for i in range(len(self.hands[player_index]))
+            if len(self.all_candidates_list[player_index][i]) == 1
+        ]
+        other_singletons = [
+            list(self.all_candidates_list[pindex][i])[0]
+            for pindex in range(self.num_players)
+            for i in range(len(self.hands[pindex]))
+            if len(self.all_candidates_list[pindex][i]) == 1 and pindex != player_index
+        ]
+        if len(player_singletons) or len(other_singletons):
+            print("Player SINGLETONS", player_singletons)
+            print("Other SINGLETONS", other_singletons)
+
+        for suit_index, rank in identities:
+            if (suit_index, rank) not in self.max_num_cards:
+                continue
+            num_singletons_held = player_singletons.count(
+                (suit_index, rank)
+            ) + other_singletons.count((suit_index, rank))
+            num_discarded = self.discards.get((suit_index, rank), 0)
+            max_num_cards = self.max_num_cards[(suit_index, rank)]
+            if (
+                (suit_index, rank) not in new_candidates
+                and num_discarded + num_singletons_held < max_num_cards
+            ):
+                nonglobal_candidates.add((suit_index, rank))
+
+        if len(nonglobal_candidates):
+            print(
+                f"{self.our_player_name} {player_index} NONGLOBAL CANDIDATES",
+                nonglobal_candidates,
+            )
+        return nonglobal_candidates
+
     def handle_clue(
         self,
         clue_giver: int,
@@ -963,6 +1025,13 @@ class EncoderV2GameState(BaseEncoderGameState):
         clue_value: int,
         card_orders,
     ):
+        touched_cards = self.process_pos_neg_clues(
+            target_index, clue_type, clue_value, card_orders
+        )
+        if not self.should_interpret_hat_clue:
+            self.track_clued_cards(clue_type, clue_value, card_orders)
+            return touched_cards
+
         order_to_index = self.order_to_index
         identity_to_residue = self.identity_to_residue
         residue_to_identities = self.residue_to_identities
@@ -1013,6 +1082,9 @@ class EncoderV2GameState(BaseEncoderGameState):
                 if len(residue_to_identities[other_res].difference(self.trash)) >= 3:
                     self.ambiguous_residue_orders.add(hat_clue_target.order)
 
+            nonglobal_candidates = self.get_nonglobal_candidates(
+                player_index, residue_to_identities[other_res], new_candidates
+            )
             if len(new_candidates):
                 self.all_candidates_list[player_index][i] = new_candidates
                 note = f" ({other_res})"
@@ -1066,6 +1138,9 @@ class EncoderV2GameState(BaseEncoderGameState):
                 if len(residue_to_identities[my_residue].difference(self.trash)) >= 3:
                     self.ambiguous_residue_orders.add(my_hat_target.order)
 
+            my_nonglobal_candidates = self.get_nonglobal_candidates(
+                self.our_player_index, residue_to_identities[my_residue], new_candidates
+            )
             if len(new_candidates):
                 self.all_candidates_list[self.our_player_index][my_i] = new_candidates
                 note = f" ({my_residue})"
@@ -1078,12 +1153,14 @@ class EncoderV2GameState(BaseEncoderGameState):
             else:
                 self.write_note(my_hat_target.order, note="someone gave a bad hat clue")
 
-        return super().handle_clue(
-            clue_giver, target_index, clue_type, clue_value, card_orders
-        )
+        self.track_clued_cards(clue_type, clue_value, card_orders)
+        return touched_cards
 
     def get_legal_clues(self) -> Dict[Tuple[int, int, int], Set[Tuple[int, int]]]:
         # (clue_value, clue_type, target_index) -> cards_touched
+        if not self.should_interpret_hat_clue:
+            return self.get_all_possible_clues_dict()
+
         sum_of_residues = 0
         identity_to_residue = self.identity_to_residue
         for player_index, hand in self.hands.items():

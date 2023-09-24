@@ -97,6 +97,6 @@ if __name__ == "__main__":
             exclude_substrings=exclude_substrings,
             shorthand=True,
         )
-    )
+    ).difference(get_missing_vars("yagami_black", 5))
     print(vars)
     print(len(vars))
