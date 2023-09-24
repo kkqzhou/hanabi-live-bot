@@ -503,10 +503,12 @@ class GameState:
 
         # possibilities include only positive/negative information
         # candidates further narrow possibilities based on conventions
+        self.all_soft_empathy_list: Dict[int, List[Set[Tuple[int, int]]]] = {}
         self.all_possibilities_list: Dict[int, List[Set[Tuple[int, int]]]] = {}
         self.all_candidates_list: Dict[int, List[Set[Tuple[int, int]]]] = {}
         for i in range(len(player_names)):
             self.hands[i] = []
+            self.all_soft_empathy_list[i] = []
             self.all_possibilities_list[i] = []
             self.all_candidates_list[i] = []
 
@@ -621,6 +623,10 @@ class GameState:
         return self.all_possibilities_list[self.our_player_index]
 
     @property
+    def our_soft_empathy(self) -> List[Set[Tuple[int, int]]]:
+        return self.all_soft_empathy_list[self.our_player_index]
+
+    @property
     def our_num_crits(self) -> int:
         return sum([self.is_critical(candidates) for candidates in self.our_candidates])
 
@@ -643,6 +649,10 @@ class GameState:
     def get_possibilities(self, order) -> Set[Tuple[int, int]]:
         player_index, i = self.order_to_index[order]
         return self.all_possibilities_list[player_index][i]
+
+    def get_soft_empathy(self, order) -> Set[Tuple[int, int]]:
+        player_index, i = self.order_to_index[order]
+        return self.all_soft_empathy_list[player_index][i]
 
     def get_card(self, order) -> Card:
         player_index, i = self.order_to_index[order]
@@ -960,6 +970,7 @@ class GameState:
         del hand[card_index]
         del self.all_candidates_list[player_index][card_index]
         del self.all_possibilities_list[player_index][card_index]
+        del self.all_soft_empathy_list[player_index][card_index]
         return card
 
     def handle_draw(self, player_index, order, suit_index, rank):
@@ -967,6 +978,9 @@ class GameState:
         self.hands[player_index].append(new_card)
         self.all_candidates_list[player_index].append(get_all_cards(self.variant_name))
         self.all_possibilities_list[player_index].append(
+            get_all_cards(self.variant_name)
+        )
+        self.all_soft_empathy_list[player_index].append(
             get_all_cards(self.variant_name)
         )
         self.process_visible_cards()
@@ -1008,6 +1022,7 @@ class GameState:
         touched_cards = []
         candidates_list = self.all_candidates_list[target_index]
         poss_list = self.all_possibilities_list[target_index]
+        soft_emp_list = self.all_soft_empathy_list[target_index]
 
         for i, card in enumerate(self.hands[target_index]):
             if card.order in card_orders:
@@ -1016,7 +1031,12 @@ class GameState:
                     all_cards_touched_by_clue
                 )
                 new_possibilities = poss_list[i].intersection(all_cards_touched_by_clue)
+                new_soft_empathy = soft_emp_list[i].intersection(
+                    all_cards_touched_by_clue
+                )
                 poss_list[i] = new_possibilities
+                soft_emp_list[i] = new_soft_empathy
+                assert len(new_possibilities) and len(new_soft_empathy)
                 if not len(new_candidates):
                     self.write_note(card.order, note="Positive clue conflict!")
                     candidates_list[i] = new_possibilities
@@ -1027,7 +1047,12 @@ class GameState:
                     all_cards_touched_by_clue
                 )
                 new_possibilities = poss_list[i].difference(all_cards_touched_by_clue)
+                new_soft_empathy = soft_emp_list[i].difference(
+                    all_cards_touched_by_clue
+                )
                 poss_list[i] = new_possibilities
+                soft_emp_list[i] = new_soft_empathy
+                assert len(new_possibilities) and len(new_soft_empathy)
                 if not len(new_candidates):
                     self.write_note(card.order, note="Negative clue conflict!")
                     candidates_list[i] = new_possibilities

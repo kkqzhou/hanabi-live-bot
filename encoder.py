@@ -979,7 +979,9 @@ class EncoderV2GameState(BaseEncoderGameState):
 
         return None, False
 
-    def get_nonglobal_candidates(self, player_index, identities, new_candidates):
+    def get_nonglobal_candidates(
+        self, player_index, identities, new_candidates
+    ) -> Set[Tuple[int, int]]:
         nonglobal_candidates = set()
         player_singletons = [
             list(self.all_candidates_list[player_index][i])[0]
@@ -1059,39 +1061,55 @@ class EncoderV2GameState(BaseEncoderGameState):
                         + (hat_clue_target.rank - 1) * len(SUITS[self.variant_name])
                     )
                     other_res = card_res % self.mod_base
-                    new_candidates = candidates.intersection(
-                        {
-                            (suit_index, rank)
-                            for (suit_index, rank) in get_all_cards(self.variant_name)
-                            if (
-                                1
-                                + suit_index
-                                + (rank - 1) * len(SUITS[self.variant_name])
-                                - other_res
-                            )
-                            % self.mod_base
-                            == 0
-                        }
-                    )
+                    fillin_candidates = {
+                        (suit_index, rank)
+                        for (suit_index, rank) in get_all_cards(self.variant_name)
+                        if (
+                            1
+                            + suit_index
+                            + (rank - 1) * len(SUITS[self.variant_name])
+                            - other_res
+                        )
+                        % self.mod_base
+                        == 0
+                    }
+                    new_candidates = candidates.intersection(fillin_candidates)
+                    in_soft_empathy = {
+                        x
+                        for x in fillin_candidates
+                        if x in self.all_soft_empathy_list[player_index][i]
+                    }
                     self.ambiguous_residue_orders.remove(hat_clue_target.order)
             else:
                 other_res = identity_to_residue[hat_clue_target.to_tuple()]
                 new_candidates = candidates.intersection(
                     residue_to_identities[other_res]
                 )
+                in_soft_empathy = {
+                    x
+                    for x in residue_to_identities[other_res]
+                    if x in self.all_soft_empathy_list[player_index][i]
+                }
                 if len(residue_to_identities[other_res].difference(self.trash)) >= 3:
                     self.ambiguous_residue_orders.add(hat_clue_target.order)
 
             nonglobal_candidates = self.get_nonglobal_candidates(
-                player_index, residue_to_identities[other_res], new_candidates
+                player_index, in_soft_empathy, new_candidates
             )
+            print(
+                f"P{player_index} {i} SOFT EMPATHY",
+                sorted(self.all_soft_empathy_list[player_index][i]),
+            )
+            note_candidates = in_soft_empathy.union(nonglobal_candidates)
+            print(f"{player_index} {i} NOTE CANDIDATES", note_candidates)
+
             if len(new_candidates):
                 self.all_candidates_list[player_index][i] = new_candidates
                 note = f" ({other_res})"
                 if hat_clue_target.order in self.ambiguous_residue_orders:
                     note += " [?]"
                 self.write_note(
-                    hat_clue_target.order, note=note, candidates=new_candidates
+                    hat_clue_target.order, note=note, candidates=note_candidates
                 )
                 self.hat_clued_card_orders.add(hat_clue_target.order)
             else:
@@ -1129,25 +1147,37 @@ class EncoderV2GameState(BaseEncoderGameState):
                 }
                 print(f"Fill-in candidates: {fillin_candidates}")
                 new_candidates = my_candidates.intersection(fillin_candidates)
+                my_in_soft_empathy = {
+                    x for x in fillin_candidates if x in self.our_soft_empathy[my_i]
+                }
                 self.ambiguous_residue_orders.remove(my_hat_target.order)
             else:
                 print(f"Hat candidates: {residue_to_identities[my_residue]}")
                 new_candidates = my_candidates.intersection(
                     residue_to_identities[my_residue]
                 )
+                my_in_soft_empathy = {
+                    x
+                    for x in residue_to_identities[my_residue]
+                    if x in self.our_soft_empathy[my_i]
+                }
                 if len(residue_to_identities[my_residue].difference(self.trash)) >= 3:
                     self.ambiguous_residue_orders.add(my_hat_target.order)
 
             my_nonglobal_candidates = self.get_nonglobal_candidates(
-                self.our_player_index, residue_to_identities[my_residue], new_candidates
+                self.our_player_index, my_in_soft_empathy, new_candidates
             )
+            print(f"MY{my_i} SOFT EMPATHY", sorted(self.our_soft_empathy[my_i]))
+            my_note_candidates = my_in_soft_empathy.union(my_nonglobal_candidates)
+            print(f"MY {my_i} NOTE CANDIDATES", my_note_candidates)
+
             if len(new_candidates):
                 self.all_candidates_list[self.our_player_index][my_i] = new_candidates
                 note = f" ({my_residue})"
                 if my_hat_target.order in self.ambiguous_residue_orders:
                     note += " [?]"
                 self.write_note(
-                    my_hat_target.order, note=note, candidates=new_candidates
+                    my_hat_target.order, note=note, candidates=my_note_candidates
                 )
                 self.hat_clued_card_orders.add(my_hat_target.order)
             else:
