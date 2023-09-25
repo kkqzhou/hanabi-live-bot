@@ -2,7 +2,7 @@ from constants import MAX_CLUE_NUM, COLOR_CLUE, RANK_CLUE
 
 import os
 import json
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass
 import numpy as np
 import itertools
@@ -25,6 +25,9 @@ DARK_SUIT_NAMES = {
     "Gray Pink",
     "Cocoa Rainbow",
     "Dark Null",
+    "Black Reversed",
+    "Dark Rainbow Reversed",
+    "Dark Prism Reversed",
 }
 
 
@@ -80,26 +83,8 @@ def get_available_rank_clues(variant_name: str):
     return [1, 2, 3, 4, 5]
 
 
-"""
-print(SUITS["Candy Corn Mix (5 Suits)"])
-print(SUITS["Candy Corn Mix (6 Suits)"])
-['Red', 'Orange D2', 'Yellow', 'White', 'Brown']
-['Red', 'Orange D2', 'Yellow', 'White', 'Brown', 'Cocoa Rainbow']
-"""
-
-
 def get_available_color_clues(variant_name: str) -> List[str]:
     available_color_clues = []
-    # TODO: confirm the following:
-    # Mahogany D, Cardinal D, Navy D, Tan D, AD suits
-    """
-    Dual-Color (6 Suits)
-    ['Orange D', 'Purple D', 'Mahogany D', 'Green D', 'Tan D', 'Navy D']
-    Dual-Color (5 Suits)
-    ['Orange D2', 'Lime D', 'Teal D', 'Indigo D', 'Cardinal D']
-    Ambiguous & Dual-Color
-    ['Tangelo AD', 'Peach AD', 'Orchid AD', 'Violet AD', 'Lime AD', 'Forest AD']
-    """
 
     for suit in [
         "Red",
@@ -109,6 +94,8 @@ def get_available_color_clues(variant_name: str) -> List[str]:
         "Orange D2",
         "Purple D",
         "Cardinal D",
+        "Mahogany D",
+        "Yellow D",
         "Tangelo AD",
         "Peach AD",
         "Orchid AD",
@@ -122,6 +109,9 @@ def get_available_color_clues(variant_name: str) -> List[str]:
         "Yellow",
         "Orange D",
         "Orange D2",
+        "Lime D",
+        "Green D",
+        "Tan D",
         "Yam MD",
         "Tangelo AD",
         "Peach AD",
@@ -132,7 +122,7 @@ def get_available_color_clues(variant_name: str) -> List[str]:
             available_color_clues.append("Yellow")
             break
 
-    for suit in ["Green", "Lime", "Lime D", "Teal D", "Geas MD"]:
+    for suit in ["Green", "Lime", "Lime D", "Teal D", "Yellow D", "Teal D2", "Geas MD"]:
         if suit in SUITS[variant_name]:
             available_color_clues.append("Green")
             break
@@ -142,8 +132,12 @@ def get_available_color_clues(variant_name: str) -> List[str]:
         "Sky",
         "Sky VA",
         "Sky EA",
+        "Teal D",
+        "Green D",
         "Purple D",
         "Indigo D",
+        "Navy D",
+        "Teal D2",
         "Beatnik MD",
         "Lime AD",
         "Forest AD",
@@ -154,7 +148,7 @@ def get_available_color_clues(variant_name: str) -> List[str]:
             available_color_clues.append("Blue")
             break
 
-    for suit in ["Purple", "Cardinal D", "Plum MD"]:
+    for suit in ["Purple", "Indigo D", "Cardinal D", "Plum MD"]:
         if suit in SUITS[variant_name]:
             available_color_clues.append("Purple")
             break
@@ -164,7 +158,12 @@ def get_available_color_clues(variant_name: str) -> List[str]:
             available_color_clues.append("Teal")
             break
 
-    for color in ["Black", "Pink", "Brown", "Dark Pink", "Dark Brown"]:
+    for suit in ["Black", "Mahogany D", "Tan D", "Navy D"]:
+        if suit in SUITS[variant_name]:
+            available_color_clues.append("Black")
+            break
+
+    for color in ["Pink", "Brown", "Dark Pink", "Dark Brown"]:
         if color in SUITS[variant_name]:
             available_color_clues.append(color)
 
@@ -185,11 +184,20 @@ def get_all_cards_with_multiplicity(variant_name: str) -> List[Tuple[int, int]]:
     for i, suit in enumerate(SUITS[variant_name]):
         for rank in range(1, 6):
             cards.append((i, rank))
-            if suit not in DARK_SUIT_NAMES and rank == 1:
-                cards.append((i, rank))
-                cards.append((i, rank))
-            elif suit not in DARK_SUIT_NAMES and rank in {2, 3, 4}:
-                cards.append((i, rank))
+            if rank == 1:
+                if suit not in DARK_SUIT_NAMES and "Reversed" not in suit:
+                    cards.append((i, rank))
+                    cards.append((i, rank))
+            elif rank in {2, 3}:
+                if suit not in DARK_SUIT_NAMES:
+                    cards.append((i, rank))
+            elif rank == 4:
+                if suit not in DARK_SUIT_NAMES and "Critical Fours" not in variant_name:
+                    cards.append((i, rank))
+            elif rank == 5:
+                if suit not in DARK_SUIT_NAMES and "Reversed" in suit:
+                    cards.append((i, rank))
+                    cards.append((i, rank))
 
     return cards
 
@@ -222,6 +230,21 @@ def get_all_touched_cards(
                         "Tomato VA",
                         "Mahogany VA",
                         "Carrot VA",
+                        "Orange D",
+                        "Orange D2",
+                        "Purple D",
+                        "Cardinal D",
+                        "Mahogany D",
+                        "Yellow D",
+                        "Yam MD",
+                        "Geas MD",
+                        "Beatnik MD",
+                        "Plum MD",
+                        "Taupe MD",
+                        "Tangelo AD",
+                        "Peach AD",
+                        "Orchid AD",
+                        "Violet AD",
                     }
                     and available_color_clues[clue_value] == "Red"
                 ):
@@ -230,8 +253,38 @@ def get_all_touched_cards(
                 if (
                     suit
                     in {
+                        "Orange D",
+                        "Orange D2",
+                        "Lime D",
+                        "Green D",
+                        "Tan D",
+                        "Yam MD",
+                        "Geas MD",
+                        "Beatnik MD",
+                        "Plum MD",
+                        "Taupe MD",
+                        "Tangelo AD",
+                        "Peach AD",
+                        "Lime AD",
+                        "Forest AD",
+                    }
+                    and available_color_clues[clue_value] == "Yellow"
+                ):
+                    cards.add((i, rank))
+
+                if (
+                    suit
+                    in {
                         "Lime",
                         "Forest",
+                        "Lime D",
+                        "Teal D",
+                        "Yellow D",
+                        "Teal D2",
+                        "Geas MD",
+                        "Beatnik MD",
+                        "Plum MD",
+                        "Taupe MD",
                     }
                     and available_color_clues[clue_value] == "Green"
                 ):
@@ -251,8 +304,36 @@ def get_all_touched_cards(
                         "Ice EA",
                         "Sapphire EA",
                         "Ocean EA",
+                        "Teal D",
+                        "Green D",
+                        "Purple D",
+                        "Indigo D",
+                        "Navy D",
+                        "Teal D2",
+                        "Beatnik MD",
+                        "Plum MD",
+                        "Taupe MD",
+                        "Lime AD",
+                        "Forest AD",
+                        "Orchid AD",
+                        "Violet AD",
                     }
                     and available_color_clues[clue_value] == "Blue"
+                ):
+                    cards.add((i, rank))
+
+                if (
+                    suit in {"Indigo D", "Cardinal D", "Plum MD", "Taupe MD"}
+                    and available_color_clues[clue_value] == "Purple"
+                ):
+                    cards.add((i, rank))
+
+                if suit == "Taupe MD" and available_color_clues[clue_value] == "Teal":
+                    cards.add((i, rank))
+
+                if (
+                    suit in {"Mahogany D", "Tan D", "Navy D"}
+                    and available_color_clues[clue_value] == "Black"
                 ):
                     cards.add((i, rank))
 
@@ -274,9 +355,6 @@ def get_all_touched_cards(
                         continue
                     else:
                         cards.add((i, rank))
-
-                # if :
-                #    cards.add((i, rank))
 
                 if (
                     (
@@ -486,9 +564,18 @@ def get_candidates_list_str(
 
 def get_starting_pace(num_players: int, variant_name: str):
     num_suits = len(SUITS[variant_name])
-    base_starting_pace = {6: 18, 5: 15, 4: 18, 3: 18, 2: 22}[num_players]
-    num_dark_suits = len({x for x in SUITS[variant_name] if x in DARK_SUIT_NAMES})
-    return base_starting_pace - (6 - num_suits) * 5 - num_dark_suits * 5
+    all_cards = get_all_cards_with_multiplicity(variant_name)
+    num_cards_dealt = {2: 10, 3: 15, 4: 16, 5: 20, 6: 18}[num_players]
+    return len(all_cards) - num_cards_dealt + num_players - num_suits * 5
+
+
+def get_starting_efficiency(num_players: int, variant_name: str):
+    num_suits = len(SUITS[variant_name])
+    starting_pace = get_starting_pace(num_players, variant_name)
+    clue_factor = 0.5 if "Clue Starved" in variant_name else 1
+    if num_players >= 5:
+        return 5 * num_suits / (8 + int((starting_pace + num_suits - 2) * clue_factor))
+    return 5 * num_suits / (8 + int((starting_pace + num_suits - 1) * clue_factor))
 
 
 class GameState:
@@ -544,15 +631,12 @@ class GameState:
 
     @property
     def max_num_cards(self) -> Dict[Tuple[int, int], int]:
-        all_cards = get_all_cards(self.variant_name)
+        all_cards = get_all_cards_with_multiplicity(self.variant_name)
         result = {}
         for suit_index, rank in all_cards:
-            result[(suit_index, rank)] = 1
-            if SUITS[self.variant_name][suit_index] not in DARK_SUIT_NAMES:
-                if rank in {2, 3, 4}:
-                    result[(suit_index, rank)] += 1
-                elif rank == 1:
-                    result[(suit_index, rank)] += 2
+            if (suit_index, rank) not in result:
+                result[(suit_index, rank)] = 0
+            result[(suit_index, rank)] += 1
         return result
 
     @property
@@ -642,16 +726,22 @@ class GameState:
                 result[card.order] = (player_index, i)
         return result
 
-    def get_candidates(self, order) -> Set[Tuple[int, int]]:
-        player_index, i = self.order_to_index[order]
+    def get_candidates(self, order) -> Optional[Set[Tuple[int, int]]]:
+        player_index, i = self.order_to_index.get(order, (None, None))
+        if player_index is None:
+            return None
         return self.all_candidates_list[player_index][i]
 
-    def get_possibilities(self, order) -> Set[Tuple[int, int]]:
-        player_index, i = self.order_to_index[order]
+    def get_possibilities(self, order) -> Optional[Set[Tuple[int, int]]]:
+        player_index, i = self.order_to_index.get(order, (None, None))
+        if player_index is None:
+            return None
         return self.all_possibilities_list[player_index][i]
 
-    def get_soft_empathy(self, order) -> Set[Tuple[int, int]]:
-        player_index, i = self.order_to_index[order]
+    def get_soft_empathy(self, order) -> Optional[Set[Tuple[int, int]]]:
+        player_index, i = self.order_to_index.get(order, (None, None))
+        if player_index is None:
+            return None
         return self.all_soft_empathy_list[player_index][i]
 
     def get_card(self, order) -> Card:
@@ -737,12 +827,17 @@ class GameState:
         if self.stacks[suit] >= rank:
             num += 1
 
-        for i in range(self.num_players):
-            if i == player_index:
+        for pindex in range(self.num_players):
+            if pindex == player_index:
                 continue
-            for card in self.hands[i]:
-                if (card.suit_index, card.rank) == (suit, rank):
-                    num += 1
+            for i, card in enumerate(self.hands[pindex]):
+                if pindex == self.our_player_index:
+                    candidates = self.our_candidates[i]
+                    if len(candidates) == 1 and list(candidates)[0] == (suit, rank):
+                        num += 1
+                else:
+                    if card.to_tuple() == (suit, rank):
+                        num += 1
         return num
 
     def get_fully_known_card_orders(
@@ -763,6 +858,27 @@ class GameState:
                     if singleton not in orders:
                         orders[singleton] = []
                     orders[singleton].append(self.hands[player_index][i].order)
+        return orders
+
+    def get_all_fully_known_card_orders(
+        self, query_candidates=True, keyed_on_order=False
+    ) -> Dict[Tuple[int, int], List[int]]:
+        orders = {}
+        for player_index in range(self.num_players):
+            poss_list = (
+                self.all_candidates_list[player_index]
+                if query_candidates
+                else self.all_possibilities_list[player_index]
+            )
+            for i, poss in enumerate(poss_list):
+                if len(poss) == 1:
+                    singleton = list(poss)[0]
+                    if keyed_on_order:
+                        orders[self.hands[player_index][i].order] = singleton
+                    else:
+                        if singleton not in orders:
+                            orders[singleton] = []
+                        orders[singleton].append(self.hands[player_index][i].order)
         return orders
 
     def get_doubleton_orders(self, player_index: int, query_candidates=True):
@@ -1058,6 +1174,7 @@ class GameState:
                     candidates_list[i] = new_possibilities
                 else:
                     candidates_list[i] = new_candidates
+        self.process_visible_cards()
         return touched_cards
 
     def track_clued_cards(self, clue_type: int, clue_value: int, card_orders):

@@ -11,6 +11,7 @@ from game_state import (
     get_all_touched_cards,
     get_available_color_clues,
     get_available_rank_clues,
+    get_starting_efficiency,
 )
 
 from typing import Callable, Dict, List, Set, Optional, Tuple
@@ -336,6 +337,8 @@ def get_special_hat_clues_dict(variant_name: str):
     all_1color_vars = [var for var in SUITS if len(get_available_color_clues(var)) == 1]
     all_lp_1_vars = [var for var in SUITS if "Light-Pink-Ones" in var]
     all_mr_1_vars = [var for var in SUITS if "Muddy-Rainbow-Ones" in var]
+    all_mat_vars = [var for var in SUITS if "Matryoshka" in var]
+    all_dc_vars = [var for var in SUITS if "Dual-Color" in var]
     all_oe_vars = [var for var in SUITS if "Odds and Evens" in var]
     base_dct = {
         var: {
@@ -355,52 +358,102 @@ def get_special_hat_clues_dict(variant_name: str):
             3: [(RANK_CLUE, 4)],
         }
 
-    for var in all_lp_1_vars:
+    for var in all_lp_1_vars + all_mr_1_vars:
         avail_color_clues = get_available_color_clues(var)
         if len(avail_color_clues) == 6:
             base_dct[var] = {
-                0: [(RANK_CLUE, 5), (COLOR_CLUE, 0)],
-                1: [(RANK_CLUE, 2), (COLOR_CLUE, 1), (COLOR_CLUE, 2)],
-                2: [(RANK_CLUE, 3), (COLOR_CLUE, 3), (COLOR_CLUE, 4)],
-                3: [(RANK_CLUE, 4), (COLOR_CLUE, 5)],
+                0: [(RANK_CLUE, 2), (COLOR_CLUE, 0), (COLOR_CLUE, 1)],
+                1: [(RANK_CLUE, 3), (COLOR_CLUE, 2)],
+                2: [(RANK_CLUE, 4), (COLOR_CLUE, 3)],
+                3: [(RANK_CLUE, 5), (COLOR_CLUE, 4), (COLOR_CLUE, 5)],
             }
         elif len(avail_color_clues) == 5:
             base_dct[var] = {
-                0: [(RANK_CLUE, 5), (COLOR_CLUE, 0)],
-                1: [(RANK_CLUE, 2), (COLOR_CLUE, 1), (COLOR_CLUE, 2)],
-                2: [(RANK_CLUE, 3), (COLOR_CLUE, 3)],
-                3: [(RANK_CLUE, 4), (COLOR_CLUE, 4)],
+                0: [(RANK_CLUE, 2), (COLOR_CLUE, 0)],
+                1: [(RANK_CLUE, 3), (COLOR_CLUE, 1)],
+                2: [(RANK_CLUE, 4), (COLOR_CLUE, 2)],
+                3: [(RANK_CLUE, 5), (COLOR_CLUE, 3), (COLOR_CLUE, 4)],
             }
         elif len(avail_color_clues) == 4:
             base_dct[var] = {
-                0: [(RANK_CLUE, 5), (COLOR_CLUE, 0)],
-                1: [(RANK_CLUE, 2), (COLOR_CLUE, 1)],
-                2: [(RANK_CLUE, 3), (COLOR_CLUE, 2)],
-                3: [(RANK_CLUE, 4), (COLOR_CLUE, 3)],
+                0: [(RANK_CLUE, 2), (COLOR_CLUE, 0)],
+                1: [(RANK_CLUE, 3), (COLOR_CLUE, 1)],
+                2: [(RANK_CLUE, 4), (COLOR_CLUE, 2)],
+                3: [(RANK_CLUE, 5), (COLOR_CLUE, 3)],
             }
 
-    for var in all_mr_1_vars:
+    for var in all_mat_vars:
         avail_color_clues = get_available_color_clues(var)
         if len(avail_color_clues) == 6:
             base_dct[var] = {
-                0: [(COLOR_CLUE, 0), (RANK_CLUE, 5)],
-                1: [(COLOR_CLUE, 1), (COLOR_CLUE, 2), (RANK_CLUE, 2)],
-                2: [(COLOR_CLUE, 3), (COLOR_CLUE, 4), (RANK_CLUE, 3)],
-                3: [(COLOR_CLUE, 5), (RANK_CLUE, 4)],
+                0: [(COLOR_CLUE, 0)],
+                1: [(COLOR_CLUE, 1)],
+                2: [(COLOR_CLUE, 2), (RANK_CLUE, 1), (RANK_CLUE, 2), (RANK_CLUE, 3)],
+                3: [
+                    (COLOR_CLUE, 3),
+                    (COLOR_CLUE, 4),
+                    (COLOR_CLUE, 5),
+                    (RANK_CLUE, 4),
+                    (RANK_CLUE, 5),
+                ],
             }
         elif len(avail_color_clues) == 5:
             base_dct[var] = {
-                0: [(COLOR_CLUE, 0), (RANK_CLUE, 5)],
-                1: [(COLOR_CLUE, 1), (COLOR_CLUE, 2), (RANK_CLUE, 2)],
-                2: [(COLOR_CLUE, 3), (RANK_CLUE, 3)],
-                3: [(COLOR_CLUE, 4), (RANK_CLUE, 4)],
+                0: [(COLOR_CLUE, 0)],
+                1: [(COLOR_CLUE, 1)],
+                2: [(COLOR_CLUE, 2), (RANK_CLUE, 1), (RANK_CLUE, 2)],
+                3: [
+                    (COLOR_CLUE, 3),
+                    (COLOR_CLUE, 4),
+                    (RANK_CLUE, 3),
+                    (RANK_CLUE, 4),
+                    (RANK_CLUE, 5),
+                ],
             }
         elif len(avail_color_clues) == 4:
             base_dct[var] = {
+                0: [(COLOR_CLUE, 0)],
+                1: [(COLOR_CLUE, 1)],
+                2: [(COLOR_CLUE, 2), (RANK_CLUE, 1), (RANK_CLUE, 2)],
+                3: [(COLOR_CLUE, 3), (RANK_CLUE, 3), (RANK_CLUE, 4), (RANK_CLUE, 5)],
+            }
+        elif len(avail_color_clues) == 3:
+            base_dct[var] = {
+                0: [(COLOR_CLUE, 0)],
+                1: [(COLOR_CLUE, 1)],
+                2: [(COLOR_CLUE, 2), (RANK_CLUE, 1), (RANK_CLUE, 2)],
+                3: [(RANK_CLUE, 3), (RANK_CLUE, 4), (RANK_CLUE, 5)],
+            }
+
+    for var in all_dc_vars:
+        avail_color_clues = get_available_color_clues(var)
+        if len(avail_color_clues) == 3:
+            base_dct[var] = {
                 0: [(COLOR_CLUE, 0), (RANK_CLUE, 5)],
+                1: [(COLOR_CLUE, 1)],
+                2: [(COLOR_CLUE, 2)],
+                3: [(RANK_CLUE, 1), (RANK_CLUE, 2), (RANK_CLUE, 3), (RANK_CLUE, 4)],
+            }
+        elif len(avail_color_clues) == 4:
+            base_dct[var] = {
+                0: [(COLOR_CLUE, 0), (RANK_CLUE, 1)],
                 1: [(COLOR_CLUE, 1), (RANK_CLUE, 2)],
                 2: [(COLOR_CLUE, 2), (RANK_CLUE, 3)],
-                3: [(COLOR_CLUE, 3), (RANK_CLUE, 4)],
+                3: [(COLOR_CLUE, 3), (RANK_CLUE, 4), (RANK_CLUE, 5)],
+            }
+        elif len(avail_color_clues) == 5:
+            base_dct[var] = {
+                0: [(COLOR_CLUE, 0), (RANK_CLUE, 1)],
+                1: [(COLOR_CLUE, 1), (RANK_CLUE, 2), (RANK_CLUE, 3)],
+                2: [(COLOR_CLUE, 2), (RANK_CLUE, 4), (RANK_CLUE, 5)],
+                3: [(COLOR_CLUE, 3), (COLOR_CLUE, 4)],
+            }
+        elif len(avail_color_clues) == 6:
+            base_dct[var] = {
+                0: [(COLOR_CLUE, 0), (RANK_CLUE, 1)],
+                1: [(COLOR_CLUE, 1), (RANK_CLUE, 2), (RANK_CLUE, 3)],
+                2: [(COLOR_CLUE, 2), (RANK_CLUE, 4), (RANK_CLUE, 5)],
+                3: [(COLOR_CLUE, 3), (COLOR_CLUE, 4), (COLOR_CLUE, 5)],
             }
 
     for var in all_oe_vars:
@@ -951,10 +1004,26 @@ class EncoderV2GameState(BaseEncoderGameState):
     def __init__(self, variant_name, player_names, our_player_index):
         super().__init__(variant_name, player_names, our_player_index, get_v2_mod_table)
         self.ambiguous_residue_orders: Set[int] = set()
+        self.last_hat_clue_notes: Dict[int, Set[Tuple[int, int]]] = {}
 
     @property
     def should_interpret_hat_clue(self) -> bool:
-        return self.clue_tokens < 8
+        starting_eff = get_starting_efficiency(self.num_players, self.variant_name)
+        hard_var1 = (self.num_players < 5) and starting_eff >= 1.4
+        hard_var2 = (self.num_players >= 5) and starting_eff >= 1.5
+        if self.clue_tokens == 8 and not hard_var1 and not hard_var2:
+            return False
+
+        good_cards_remaining = {
+            x for x in get_all_cards(self.variant_name) if x not in self.trash
+        }
+        all_fully_known_card_orders = self.get_all_fully_known_card_orders()
+        for suit_index, rank in good_cards_remaining:
+            if (suit_index, rank) not in all_fully_known_card_orders:
+                return True
+
+        print("*** All remaining cards are fully known! Don't interpret hat clues")
+        return False
 
     def get_hat_clue_target(self, player_index) -> Tuple[Optional[Card], bool]:
         # return_type: (card, is_in_ambiguous_orders)
@@ -994,9 +1063,6 @@ class EncoderV2GameState(BaseEncoderGameState):
             for i in range(len(self.hands[pindex]))
             if len(self.all_candidates_list[pindex][i]) == 1 and pindex != player_index
         ]
-        if len(player_singletons) or len(other_singletons):
-            print("Player SINGLETONS", player_singletons)
-            print("Other SINGLETONS", other_singletons)
 
         for suit_index, rank in identities:
             if (suit_index, rank) not in self.max_num_cards:
@@ -1012,11 +1078,6 @@ class EncoderV2GameState(BaseEncoderGameState):
             ):
                 nonglobal_candidates.add((suit_index, rank))
 
-        if len(nonglobal_candidates):
-            print(
-                f"{self.our_player_name} {player_index} NONGLOBAL CANDIDATES",
-                nonglobal_candidates,
-            )
         return nonglobal_candidates
 
     def handle_clue(
@@ -1098,6 +1159,7 @@ class EncoderV2GameState(BaseEncoderGameState):
                 sorted(self.all_soft_empathy_list[player_index][i]),
             )
             note_candidates = in_soft_empathy.union(nonglobal_candidates)
+            self.last_hat_clue_notes[hat_clue_target.order] = note_candidates
             assert not len(new_candidates.difference(note_candidates))
             if len(note_candidates.difference(self.trash)) >= 3:
                 self.ambiguous_residue_orders.add(hat_clue_target.order)
@@ -1166,6 +1228,7 @@ class EncoderV2GameState(BaseEncoderGameState):
             )
             print(f"MY{my_i} SOFT EMPATHY", sorted(self.our_soft_empathy[my_i]))
             my_note_candidates = my_in_soft_empathy.union(my_nonglobal_candidates)
+            self.last_hat_clue_notes[my_hat_target.order] = my_note_candidates
             assert not len(new_candidates.difference(my_note_candidates))
             if len(my_note_candidates.difference(self.trash)) >= 3:
                 self.ambiguous_residue_orders.add(my_hat_target.order)
@@ -1181,6 +1244,33 @@ class EncoderV2GameState(BaseEncoderGameState):
                 self.hat_clued_card_orders.add(my_hat_target.order)
             else:
                 self.write_note(my_hat_target.order, note="someone gave a bad hat clue")
+
+        self.process_visible_cards()
+        ambig_orders_to_remove = set()
+        for order in self.ambiguous_residue_orders:
+            if order not in order_to_index:
+                continue
+
+            player_index, i = order_to_index[order]
+            cands = self.all_candidates_list[player_index][i]
+            last_hat_clue_notes = self.last_hat_clue_notes[order]
+            soft_empathy = self.all_soft_empathy_list[player_index][i]
+            nonglobal_cands = self.get_nonglobal_candidates(
+                player_index, last_hat_clue_notes.intersection(soft_empathy), cands
+            )
+            if len(cands) == 1:
+                print(
+                    f"P{player_index} {i} Lencands = 1! Nonglobals: {nonglobal_cands}, "
+                    f"cands before clue: {last_hat_clue_notes}"
+                )
+            if not len(nonglobal_cands) and len(cands) == 1:
+                print(f"Would remove order {order} from ambig residue orders")
+                ambig_orders_to_remove.add(order)
+                self.write_note(order, note="", candidates=cands)
+
+        self.ambiguous_residue_orders = self.ambiguous_residue_orders.difference(
+            ambig_orders_to_remove
+        )
 
         self.track_clued_cards(clue_type, clue_value, card_orders)
         return touched_cards

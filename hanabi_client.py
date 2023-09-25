@@ -527,7 +527,7 @@ class HanabiClient:
                 next_player_has_safe_action = True
                 break
 
-        if not next_player_has_safe_action and state.clue_tokens > 0:
+        if not next_player_has_safe_action and state.clue_tokens >= 1:
             if np_chop_order is not None:
                 np_chop = state.get_card(np_chop_order)
                 if (np_chop.suit_index, np_chop.rank) in state.playables:
@@ -802,11 +802,10 @@ class HanabiClient:
 
         if state.pace < 0 or state.num_cards_in_deck <= 0:
             for i in range(len(state.our_hand)):
-                order = state.our_hand[-i - 1]
                 candidates = state.our_candidates[-i - 1]
                 if len(candidates.intersection(state.playables)):
                     print("LAST RESORT PLAY")
-                    self.play(order, table_id)
+                    self.play(state.our_hand[-i - 1].order, table_id)
                     return
 
         lnhcs = state.get_leftmost_non_hat_clued_cards()
@@ -860,7 +859,7 @@ class HanabiClient:
                     return
 
         # basic stall in endgame
-        if state.clue_tokens > 0 and (state.pace < 3 or state.num_cards_in_deck == 1):
+        if state.clue_tokens >= 1 and (state.pace < 3 or state.num_cards_in_deck == 1):
             for (clue_value, clue_type, target_index), _ in legal_hat_clues:
                 print("STALL CLUE!")
                 self.clue(target_index, clue_type, clue_value, table_id)
@@ -897,7 +896,7 @@ class HanabiClient:
                 return
 
         # unless we have no safe actions
-        if state.clue_tokens > 0 and len(legal_hat_clues):
+        if state.clue_tokens >= 1 and len(legal_hat_clues):
             for (clue_value, clue_type, target_index), _ in legal_hat_clues:
                 print("CLUE BECAUSE NO SAFE ACTION!")
                 self.clue(target_index, clue_type, clue_value, table_id)
@@ -1162,7 +1161,7 @@ class HanabiClient:
                 return
 
         # unless we have no safe actions
-        if state.clue_tokens > 0 and len(legal_hat_clues):
+        if state.clue_tokens >= 1 and len(legal_hat_clues):
             for (clue_value, clue_type, target_index), _ in legal_hat_clues:
                 print("CLUE BECAUSE NO SAFE ACTION!")
                 self.clue(target_index, clue_type, clue_value, table_id)

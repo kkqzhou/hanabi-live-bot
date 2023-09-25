@@ -75,15 +75,12 @@ def get_missing_vars(
 if __name__ == "__main__":
     exclude_substrings = [
         "Throw",
-        "Dual-Color",
         "Reversed",
         "Up or Down",
         "Alternating",
         "Duck",
         "Cow",
         "Synesthesia",
-        "Clue Starved",
-        "Critical Fours",
     ]
     include_substrings = None
 
@@ -97,6 +94,6 @@ if __name__ == "__main__":
             exclude_substrings=exclude_substrings,
             shorthand=True,
         )
-    ).difference(get_missing_vars("yagami_black", 5))
+    )
     print(vars)
     print(len(vars))
