@@ -86,6 +86,25 @@ def test_trash():
     )
 
 
+def test_reversed():
+    variant_name = "White Reversed (5 Suits)"
+    STATES_3P = create_game_states(3, variant_name)
+    state = STATES_3P[0]
+    check_eq(state.stacks, [0, 0, 0, 0, 6])
+    check_eq(state.trash, set())
+    check_eq(state.criticals, {(0, 5), (1, 5), (2, 5), (3, 5), (4, 1)})
+    check_eq(state.playables, {(0, 1), (1, 1), (2, 1), (3, 1), (4, 5)})
+    state.discards[(4, 5)] = 2
+    check_eq(state.criticals, {(0, 5), (1, 5), (2, 5), (3, 5), (4, 1), (4, 5)})
+    state.stacks = [0, 0, 0, 0, 4]
+    state.discards[(4, 2)] = 1
+    check_eq(state.trash, {(4, 4), (4, 5)})
+    check_eq(state.criticals, {(0, 5), (1, 5), (2, 5), (3, 5), (4, 1), (4, 2)})
+    check_eq(state.playables, {(0, 1), (1, 1), (2, 1), (3, 1), (4, 3)})
+    state.discards[(4, 3)] = 2
+    check_eq(state.trash, {(4, 4), (4, 5), (4, 2), (4, 1)})
+
+
 def test_criticals():
     variant_name = "Black (5 Suits)"
     STATES_3P = create_game_states(3, variant_name)
@@ -231,6 +250,7 @@ def test_all():
     t0 = dt.datetime.now()
     test_max_num_cards()
     test_trash()
+    test_reversed()
     test_criticals()
     test_process_visible_cards()
     test_handle_clue()
@@ -239,4 +259,5 @@ def test_all():
 
 
 if __name__ == "__main__":
-    test_all()
+    # test_all()
+    test_reversed()

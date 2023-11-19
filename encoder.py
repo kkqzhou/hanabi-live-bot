@@ -758,8 +758,6 @@ class BaseEncoderGameState(GameState):
                     rightmost_unnumbered = self.get_rightmost_unnumbered_card(
                         target_index
                     )
-                    # iterate over rank clues
-                    # TODO: special 1s/5s
                     rank_to_cards_touched = {}
                     for clue_value in get_available_rank_clues(self.variant_name):
                         cards_touched = get_all_touched_cards(

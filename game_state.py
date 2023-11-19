@@ -205,7 +205,6 @@ def get_all_cards_with_multiplicity(variant_name: str) -> List[Tuple[int, int]]:
 def get_all_touched_cards(
     clue_type: int, clue_value: int, variant_name: str
 ) -> Set[Tuple[int, int]]:
-    # TODO - handle dual color
     available_color_clues = get_available_color_clues(variant_name)
     prism_touch = list(zip(available_color_clues * 5, [1, 2, 3, 4, 5]))
     cards = set()
@@ -604,7 +603,6 @@ class GameState:
         self.rank_clued_card_orders: Dict[int, List[int]] = {}  # order -> clue vals
         self.color_clued_card_orders: Dict[int, List[int]] = {}  # order -> clue vals
         self.other_info_clued_card_orders: Dict[str, Set[int]] = {}
-        self.stacks: List[int] = [0] * len(SUITS[variant_name])
         self.discards: Dict[
             Tuple[int, int], int
         ] = {}  # keys are tuples of (suit_index, rank)
@@ -622,8 +620,10 @@ class GameState:
 
     @property
     def playables(self) -> Set[Tuple[int, int]]:
-        # TODO: handle reversed
-        return set([(suit, stack + 1) for suit, stack in enumerate(self.stacks)])
+        return {
+            (suit, stack + (-1 if "Reversed" in SUITS[self.variant_name][suit] else 1))
+            for suit, stack in enumerate(self.stacks)
+        }
 
     @property
     def score_pct(self) -> float:
@@ -641,7 +641,6 @@ class GameState:
 
     @property
     def criticals(self) -> Set[Tuple[int, int]]:
-        # TODO: handle reversed
         trash = self.trash
         crits = set()
         for (suit, rank), max_num in self.max_num_cards.items():
@@ -657,22 +656,38 @@ class GameState:
 
     @property
     def trash(self) -> Set[Tuple[int, int]]:
-        # TODO: handle reversed
         trash_cards = set()
         for suit, stack in enumerate(self.stacks):
-            for i in range(stack):
-                trash_cards.add((suit, i + 1))
+            is_reversed = "Reversed" in SUITS[self.variant_name][suit]
+            if is_reversed:
+                for i in range(stack, 6):
+                    trash_cards.add((suit, i))
+            else:
+                for i in range(stack):
+                    trash_cards.add((suit, i + 1))
 
-        dead_suits = {suit: 5 for suit, _ in enumerate(self.stacks)}
+        dead_suits = {
+            suit: 5 if "Reversed" not in SUITS[self.variant_name][suit] else 0
+            for suit, _ in enumerate(self.stacks)
+        }
         max_num_cards = self.max_num_cards
         for (suit, rank), num_discards in self.discards.items():
+            is_reversed = "Reversed" in SUITS[self.variant_name][suit]
             assert num_discards <= max_num_cards[(suit, rank)]
             if num_discards == max_num_cards[(suit, rank)]:
-                dead_suits[suit] = min(rank, dead_suits[suit])
+                if is_reversed:
+                    dead_suits[suit] = max(rank, dead_suits[suit])
+                else:
+                    dead_suits[suit] = min(rank, dead_suits[suit])
 
         for suit, dead_from in dead_suits.items():
-            for i in range(dead_from + 1, 6):
-                trash_cards.add((suit, i))
+            is_reversed = "Reversed" in SUITS[self.variant_name][suit]
+            if is_reversed:
+                for i in range(dead_from - 1, 0, -1):
+                    trash_cards.add((suit, i))
+            else:
+                for i in range(dead_from + 1, 6):
+                    trash_cards.add((suit, i))
         return trash_cards
 
     @property
@@ -820,7 +835,12 @@ class GameState:
 
     def set_variant_name(self, variant_name: str, num_players: int):
         self.variant_name = variant_name
-        self.stacks = [0] * len(SUITS[self.variant_name])
+        self.stacks = []
+        for suit in SUITS[self.variant_name]:
+            if "Reversed" in suit:
+                self.stacks.append(6)
+            else:
+                self.stacks.append(0)
 
     def get_copies_visible(self, player_index, suit, rank) -> int:
         num = self.discards.get((suit, rank), 0)

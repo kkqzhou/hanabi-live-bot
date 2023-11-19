@@ -686,6 +686,7 @@ class HanabiClient:
                     )
                     duped_in_another_hand = (
                         order in my_good_actions["dupe_in_other_hand"]
+                        and state.num_cards_in_deck != 1
                     )
                     if dire_circumstances:
                         print(f"Would love to play {identity} but cannot")
