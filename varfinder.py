@@ -82,14 +82,14 @@ if __name__ == "__main__":
         "Cow",
         "Synesthesia",
     ]
-    include_substrings = None
+    include_substrings = ["Dark Null"]
 
     vars = set(
         get_missing_vars(
             "yagami_blue",
             5,
             include_dark_suits=True,
-            num_suits=5,
+            num_suits=6,
             include_substrings=include_substrings,
             exclude_substrings=exclude_substrings,
             shorthand=True,

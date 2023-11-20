@@ -1132,10 +1132,10 @@ class EncoderV2GameState(BaseEncoderGameState):
                     == 0
                 }
                 new_candidates = candidates.intersection(fillin_candidates)
-                in_soft_empathy = {
+                in_base_filtration = {
                     x
                     for x in fillin_candidates
-                    if x in self.all_soft_empathy_list[player_index][i]
+                    if x in self.all_base_filtrations_list[player_index][i]
                 }
                 self.ambiguous_residue_orders.remove(hat_clue_target.order)
             else:
@@ -1143,20 +1143,20 @@ class EncoderV2GameState(BaseEncoderGameState):
                 new_candidates = candidates.intersection(
                     residue_to_identities[other_res]
                 )
-                in_soft_empathy = {
+                in_base_filtration = {
                     x
                     for x in residue_to_identities[other_res]
-                    if x in self.all_soft_empathy_list[player_index][i]
+                    if x in self.all_base_filtrations_list[player_index][i]
                 }
 
             nonglobal_candidates = self.get_nonglobal_candidates(
-                player_index, in_soft_empathy, new_candidates
+                player_index, in_base_filtration, new_candidates
             )
             print(
-                f"P{player_index} {i} SOFT EMPATHY",
-                sorted(self.all_soft_empathy_list[player_index][i]),
+                f"P{player_index} {i} BASE FILTRATION",
+                sorted(self.all_base_filtrations_list[player_index][i]),
             )
-            note_candidates = in_soft_empathy.union(nonglobal_candidates)
+            note_candidates = in_base_filtration.union(nonglobal_candidates)
             self.last_hat_clue_notes[hat_clue_target.order] = note_candidates
             assert not len(new_candidates.difference(note_candidates))
             if len(note_candidates.difference(self.trash)) >= 3:
@@ -1206,8 +1206,8 @@ class EncoderV2GameState(BaseEncoderGameState):
                 }
                 print(f"Fill-in candidates: {fillin_candidates}")
                 new_candidates = my_candidates.intersection(fillin_candidates)
-                my_in_soft_empathy = {
-                    x for x in fillin_candidates if x in self.our_soft_empathy[my_i]
+                my_in_base_filtration = {
+                    x for x in fillin_candidates if x in self.our_base_filtration[my_i]
                 }
                 self.ambiguous_residue_orders.remove(my_hat_target.order)
             else:
@@ -1215,17 +1215,17 @@ class EncoderV2GameState(BaseEncoderGameState):
                 new_candidates = my_candidates.intersection(
                     residue_to_identities[my_residue]
                 )
-                my_in_soft_empathy = {
+                my_in_base_filtration = {
                     x
                     for x in residue_to_identities[my_residue]
-                    if x in self.our_soft_empathy[my_i]
+                    if x in self.our_base_filtration[my_i]
                 }
 
             my_nonglobal_candidates = self.get_nonglobal_candidates(
-                self.our_player_index, my_in_soft_empathy, new_candidates
+                self.our_player_index, my_in_base_filtration, new_candidates
             )
-            print(f"MY{my_i} SOFT EMPATHY", sorted(self.our_soft_empathy[my_i]))
-            my_note_candidates = my_in_soft_empathy.union(my_nonglobal_candidates)
+            print(f"MY{my_i} BASE FILTRATION", sorted(self.our_base_filtration[my_i]))
+            my_note_candidates = my_in_base_filtration.union(my_nonglobal_candidates)
             self.last_hat_clue_notes[my_hat_target.order] = my_note_candidates
             assert not len(new_candidates.difference(my_note_candidates))
             if len(my_note_candidates.difference(self.trash)) >= 3:
@@ -1252,9 +1252,9 @@ class EncoderV2GameState(BaseEncoderGameState):
             player_index, i = order_to_index[order]
             cands = self.all_candidates_list[player_index][i]
             last_hat_clue_notes = self.last_hat_clue_notes[order]
-            soft_empathy = self.all_soft_empathy_list[player_index][i]
+            base_filtration = self.all_base_filtrations_list[player_index][i]
             nonglobal_cands = self.get_nonglobal_candidates(
-                player_index, last_hat_clue_notes.intersection(soft_empathy), cands
+                player_index, last_hat_clue_notes.intersection(base_filtration), cands
             )
             if len(cands) == 1:
                 print(

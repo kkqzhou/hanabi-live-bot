@@ -589,12 +589,13 @@ class GameState:
 
         # possibilities include only positive/negative information
         # candidates further narrow possibilities based on conventions
-        self.all_soft_empathy_list: Dict[int, List[Set[Tuple[int, int]]]] = {}
+        # a "filtration" refers to a global information empathy system
+        self.all_base_filtrations_list: Dict[int, List[Set[Tuple[int, int]]]] = {}
         self.all_possibilities_list: Dict[int, List[Set[Tuple[int, int]]]] = {}
         self.all_candidates_list: Dict[int, List[Set[Tuple[int, int]]]] = {}
         for i in range(len(player_names)):
             self.hands[i] = []
-            self.all_soft_empathy_list[i] = []
+            self.all_base_filtrations_list[i] = []
             self.all_possibilities_list[i] = []
             self.all_candidates_list[i] = []
 
@@ -722,8 +723,8 @@ class GameState:
         return self.all_possibilities_list[self.our_player_index]
 
     @property
-    def our_soft_empathy(self) -> List[Set[Tuple[int, int]]]:
-        return self.all_soft_empathy_list[self.our_player_index]
+    def our_base_filtration(self) -> List[Set[Tuple[int, int]]]:
+        return self.all_base_filtrations_list[self.our_player_index]
 
     @property
     def our_num_crits(self) -> int:
@@ -753,11 +754,11 @@ class GameState:
             return None
         return self.all_possibilities_list[player_index][i]
 
-    def get_soft_empathy(self, order) -> Optional[Set[Tuple[int, int]]]:
+    def get_base_filtration(self, order) -> Optional[Set[Tuple[int, int]]]:
         player_index, i = self.order_to_index.get(order, (None, None))
         if player_index is None:
             return None
-        return self.all_soft_empathy_list[player_index][i]
+        return self.all_base_filtrations_list[player_index][i]
 
     def get_card(self, order) -> Card:
         player_index, i = self.order_to_index[order]
@@ -1106,7 +1107,7 @@ class GameState:
         del hand[card_index]
         del self.all_candidates_list[player_index][card_index]
         del self.all_possibilities_list[player_index][card_index]
-        del self.all_soft_empathy_list[player_index][card_index]
+        del self.all_base_filtrations_list[player_index][card_index]
         return card
 
     def handle_draw(self, player_index, order, suit_index, rank):
@@ -1116,7 +1117,7 @@ class GameState:
         self.all_possibilities_list[player_index].append(
             get_all_cards(self.variant_name)
         )
-        self.all_soft_empathy_list[player_index].append(
+        self.all_base_filtrations_list[player_index].append(
             get_all_cards(self.variant_name)
         )
         self.process_visible_cards()
@@ -1158,7 +1159,7 @@ class GameState:
         touched_cards = []
         candidates_list = self.all_candidates_list[target_index]
         poss_list = self.all_possibilities_list[target_index]
-        soft_emp_list = self.all_soft_empathy_list[target_index]
+        base_filt_list = self.all_base_filtrations_list[target_index]
 
         for i, card in enumerate(self.hands[target_index]):
             if card.order in card_orders:
@@ -1167,12 +1168,12 @@ class GameState:
                     all_cards_touched_by_clue
                 )
                 new_possibilities = poss_list[i].intersection(all_cards_touched_by_clue)
-                new_soft_empathy = soft_emp_list[i].intersection(
+                new_base_filt = base_filt_list[i].intersection(
                     all_cards_touched_by_clue
                 )
                 poss_list[i] = new_possibilities
-                soft_emp_list[i] = new_soft_empathy
-                assert len(new_possibilities) and len(new_soft_empathy)
+                base_filt_list[i] = new_base_filt
+                assert len(new_possibilities) and len(new_base_filt)
                 if not len(new_candidates):
                     self.write_note(card.order, note="Positive clue conflict!")
                     candidates_list[i] = new_possibilities
@@ -1183,12 +1184,10 @@ class GameState:
                     all_cards_touched_by_clue
                 )
                 new_possibilities = poss_list[i].difference(all_cards_touched_by_clue)
-                new_soft_empathy = soft_emp_list[i].difference(
-                    all_cards_touched_by_clue
-                )
+                new_base_filt = base_filt_list[i].difference(all_cards_touched_by_clue)
                 poss_list[i] = new_possibilities
-                soft_emp_list[i] = new_soft_empathy
-                assert len(new_possibilities) and len(new_soft_empathy)
+                base_filt_list[i] = new_base_filt
+                assert len(new_possibilities) and len(new_base_filt)
                 if not len(new_candidates):
                     self.write_note(card.order, note="Negative clue conflict!")
                     candidates_list[i] = new_possibilities
