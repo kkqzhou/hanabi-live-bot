@@ -1010,9 +1010,7 @@ class EncoderV2GameState(BaseEncoderGameState):
     @property
     def should_interpret_hat_clue(self) -> bool:
         starting_eff = get_starting_efficiency(self.num_players, self.variant_name)
-        hard_var1 = (self.num_players < 5) and starting_eff >= 1.4
-        hard_var2 = (self.num_players >= 5) and starting_eff >= 1.5
-        if self.clue_tokens == 8 and not hard_var1 and not hard_var2:
+        if self.clue_tokens == 8 and starting_eff < 1.36:
             return False
 
         good_cards_remaining = {
