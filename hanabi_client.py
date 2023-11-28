@@ -5,6 +5,7 @@ from constants import ACTION, COLOR_CLUE, RANK_CLUE
 from game_state import GameState
 from encoder import EncoderV1GameState, EncoderV2GameState
 from h_group import HGroupGameState
+from ref_sieve import RefSieveGameState
 import traceback
 from typing import Dict, Type
 
@@ -26,6 +27,7 @@ class HanabiClient:
         convention: str,
         disconnect_on_game_end: bool,
         table_name: str,
+        max_num_players: int
     ):
         self.bot_to_join = bot_to_join
         self.convention_name = (
@@ -35,9 +37,11 @@ class HanabiClient:
             "encoderv1": EncoderV1GameState,
             "encoderv2": EncoderV2GameState,
             "hgroup": HGroupGameState,
+            "refsieve": RefSieveGameState,
         }[self.convention_name]
         self.disconnect_on_game_end = disconnect_on_game_end
         self.table_name = table_name
+        self.max_num_players = max_num_players
 
         # Initialize all class variables
         self.commandHandlers = {}
@@ -235,7 +239,7 @@ class HanabiClient:
     def chat_create_table(self):
         self.send(
             "tableCreate",
-            {"name": self.table_name, "maxPlayers": 5},
+            {"name": self.table_name, "maxPlayers": self.max_num_players},
         )
 
     def chat_set_variant(self, variant_name: str):
@@ -498,6 +502,8 @@ class HanabiClient:
             self.encoder_v2(state, table_id)
         elif isinstance(state, HGroupGameState):
             self.hgroup(state, table_id)
+        elif isinstance(state, RefSieveGameState):
+            self.ref_sieve(state, table_id)
         else:
             raise ValueError(type(state))
 
@@ -633,6 +639,142 @@ class HanabiClient:
         else:
             burn_clue_card = state.hands[state.next_player_index][0]
         self.clue(state.next_player_index, RANK_CLUE, burn_clue_card.rank, table_id)
+
+    def ref_sieve(self, state: RefSieveGameState, table_id: int):
+        ref_sieve_clues = state.get_ref_sieve_clues()
+        print('Players play/discard/chop:')
+        for pindex in range(state.num_players):
+            print(pindex, state.play_orders[pindex], state.discard_orders[pindex], state.get_chop_order(pindex))
+
+        print('All ref sieve clues:')
+        for x, y in ref_sieve_clues.items():
+            assert y in {"SAFE_ACTION", "DIRECT_PLAY", "REF_PLAY", "REF_DISCARD", "LOCK"}
+            print(x, y)
+        
+        bob = state.next_player_index
+        bob_chop_order = state.get_chop_order(bob)
+        if bob_chop_order is not None:
+            bob_chop_card = state.get_card(bob_chop_order)
+            urgent_card_on_bobs_chop = (state.is_playable_card(bob_chop_card) and bob_chop_order not in state.clued_card_orders) or state.is_critical_card(bob_chop_card)
+            bob_no_safe_actions = (
+                len(state.play_orders[bob]) +
+                len(state.discard_orders[bob]) == 0
+            )
+            clues_to_bob = {x: y for x, y in ref_sieve_clues.items() if x[-1] == bob}
+            if (state.clue_tokens >= 1) and (state.num_cards_in_deck >= 2) and urgent_card_on_bobs_chop and bob_no_safe_actions:
+                print('Bob has a crit/playable on chop and no safe actions!')
+                play_clues_to_bob = [x for x, y in clues_to_bob.items() if y in {"DIRECT_PLAY", "REF_PLAY"}]
+                safe_action_clues_to_bob = [x for x, y in clues_to_bob.items() if y in {"SAFE_ACTION"}]
+                discard_clues_to_bob = [x for x, y in clues_to_bob.items() if y in {"REF_DISCARD"}]
+                if len(play_clues_to_bob):
+                    play_clues_ranked = sorted(
+                        play_clues_to_bob, key=lambda x: state.evaluate_clue_score(x[0], x[1], x[2])
+                    )
+                    for clue_type, clue_value, target_index in play_clues_ranked:
+                        self.clue(target_index, clue_type, clue_value, table_id)
+                        return
+
+                if len(safe_action_clues_to_bob):
+                    clue_type, clue_value, _ = safe_action_clues_to_bob[0]
+                    self.clue(bob, clue_type, clue_value, table_id)
+                    return
+                
+                if len(discard_clues_to_bob):
+                    # find a clue that gets rid of trash
+                    for clue_type, clue_value, _ in discard_clues_to_bob:
+                        discard_index = state.get_index_of_ref_discard_target(bob, clue_type, clue_value)
+                        if discard_index is None:
+                            continue
+
+                        discard_target_card = state.hands[bob][discard_index]
+                        touched_cards = state.get_touched_cards(clue_type, clue_value, bob)
+                        newly_touched_cards = [card for card in touched_cards if card.order not in state.clued_card_orders]
+                        does_not_bad_touch = True
+                        for card in newly_touched_cards:
+                            if state.is_weak_trash_card(card):
+                                does_not_bad_touch = False
+                        if does_not_bad_touch and state.is_weak_trash_card(discard_target_card):
+                            print('Found kt to remove in Bobs hand!')
+                            self.clue(bob, clue_type, clue_value, table_id)
+                            return
+                        
+                    # otherwise find a clue that doesn't get rid of a crit
+                    for clue_type, clue_value, _ in discard_clues_to_bob:
+                        discard_index = state.get_index_of_ref_discard_target(bob, clue_type, clue_value)
+                        if discard_index is None:
+                            continue
+
+                        discard_target_card = state.hands[bob][discard_index]
+                        if not state.is_critical_card(discard_target_card):
+                            print('No kt to remove in Bobs hand, saving crits instead')
+                            self.clue(bob, clue_type, clue_value, table_id)
+                            return
+
+        if len(state.our_play_orders):
+            self.play(state.our_play_orders[0], table_id)
+            return
+        
+        play_clues = [x for x, y in ref_sieve_clues.items() if y in {"DIRECT_PLAY", "REF_PLAY"}]
+        safe_action_clues = [x for x, y in ref_sieve_clues.items() if y in {"SAFE_ACTION"}]
+        discard_clues = [x for x, y in ref_sieve_clues.items() if y in {"REF_DISCARD"}]
+        lock_clues = [x for x, y in ref_sieve_clues.items() if y in {"LOCK"}]
+        if (state.clue_tokens >= 2):
+            print('Give some sort of useful clue')
+
+            if len(play_clues):
+                play_clues_ranked = sorted(
+                    play_clues, key=lambda x: state.evaluate_clue_score(x[0], x[1], x[2])
+                )
+                for clue_type, clue_value, target_index in play_clues_ranked:
+                    self.clue(target_index, clue_type, clue_value, table_id)
+                    return
+            
+            if len(safe_action_clues):
+                for clue_type, clue_value, target_index in safe_action_clues:
+                    touched_cards = state.get_touched_cards(clue_type, clue_value, target_index)
+                    newly_touched_cards = [card for card in touched_cards if card.order not in state.clued_card_orders]
+                    for card in newly_touched_cards:
+                        if state.is_weak_trash_card(card):
+                            continue
+                        
+                        self.clue(target_index, clue_type, clue_value, table_id)
+                        return
+            
+            if len(discard_clues):
+                players_with_good_chops = [
+                    pindex for pindex in range(state.num_players)
+                    if pindex != state.our_player_index
+                    and state.get_chop_order(pindex) is not None
+                    and not state.is_weak_trash_card(state.get_card(state.get_chop_order(pindex)))
+                ]
+                good_discard_clues = [x for x in discard_clues if x[-1] in players_with_good_chops]
+                for clue_type, clue_value, target_index in good_discard_clues:
+                    discard_index = state.get_index_of_ref_discard_target(target_index, clue_type, clue_value)
+                    if discard_index is None:
+                        continue
+
+                    discard_target_card = state.hands[target_index][discard_index]
+                    touched_cards = state.get_touched_cards(clue_type, clue_value, target_index)
+                    newly_touched_cards = [card for card in touched_cards if card.order not in state.clued_card_orders]
+                    does_not_bad_touch = True
+                    for card in newly_touched_cards:
+                        if state.is_weak_trash_card(card):
+                            does_not_bad_touch = False
+                    if does_not_bad_touch and state.is_weak_trash_card(discard_target_card):
+                        self.clue(target_index, clue_type, clue_value, table_id)
+                        return
+
+        if len(state.our_discard_orders):
+            self.discard(state.our_discard_orders[0], table_id)
+            return
+        
+        if (state.clue_tokens < 8):
+            chop_order = state.get_chop_order(state.our_player_index)
+            if chop_order is not None:
+                self.discard(chop_order, table_id)
+                return
+
+        self.play(state.our_hand[-1].order, table_id)
 
     def encoder_v2(self, state: EncoderV2GameState, table_id: int):
         # ragequit
