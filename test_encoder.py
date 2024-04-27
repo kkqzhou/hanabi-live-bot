@@ -1,4 +1,4 @@
-from encoder import BaseEncoderGameState, EncoderV1GameState
+from conventions.encoder import BaseEncoderGameState, EncoderV1GameState
 from game_state import RANK_CLUE, COLOR_CLUE, get_all_touched_cards, SUITS, Card
 from test_functions import check_eq
 from test_game_state import create_game_states, get_deck_from_tuples

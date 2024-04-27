@@ -3,9 +3,9 @@ import websocket
 
 from constants import ACTION, COLOR_CLUE, RANK_CLUE
 from game_state import GameState
-from encoder import EncoderV1GameState, EncoderV2GameState
-from h_group import HGroupGameState
-from ref_sieve import RefSieveGameState
+from conventions.encoder import EncoderV1GameState, EncoderV2GameState
+from conventions.h_group import HGroupGameState
+from conventions.ref_sieve import RefSieveGameState
 import traceback
 from typing import Dict, Type
 
