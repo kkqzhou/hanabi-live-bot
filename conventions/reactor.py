@@ -1,5 +1,5 @@
 from game_state import (
-    GameState, get_all_touched_cards, RANK_CLUE, COLOR_CLUE, Card,
+    GameState, RANK_CLUE, COLOR_CLUE, Card,
     get_available_color_clues, get_available_rank_clues
 )
 from typing import Dict, List, Tuple, Optional, Set
@@ -7,13 +7,8 @@ from dataclasses import dataclass
 from copy import deepcopy
 from enum import Enum
 
-# WIPWIPWIP
 
-class BadRefSieveClue(Exception):
-    pass
-
-
-class RefSieveGameState(GameState):
+class ReactorGameState(GameState):
     def __init__(self, variant_name, player_names, our_player_index):
         super().__init__(variant_name, player_names, our_player_index)
         self.discard_orders: Dict[int, List[int]] = {
@@ -41,6 +36,10 @@ class RefSieveGameState(GameState):
     def all_play_tuples(self) -> Set[Tuple[int, int]]:
         play_tuples = {self.get_card(order).to_tuple() for order in self.all_play_orders}
         return {x for x in play_tuples if x[-1] > 0}
+    
+    @property
+    def all_discard_orders(self) -> List[int]:
+        return [x for discard_orders in self.discard_orders.values() for x in discard_orders]
 
     @property
     def our_play_orders(self) -> List[int]:
@@ -66,17 +65,67 @@ class RefSieveGameState(GameState):
             if tup[-1] > 0:
                 result.add(tup)
         return result
-    
+
     def is_weak_trash(self, candidates: Set[Tuple[int, int]]) -> bool:
         return not len(candidates.difference(self.weak_trash)) and len(candidates)
     
     def is_weak_trash_card(self, card: Card) -> bool:
         return card.to_tuple() in self.weak_trash
+    
+    def has_safe_play(self, player_index: int) -> bool:
+        return len(self.play_orders[player_index]) > 0
+    
+    def has_safe_discard(self, player_index: int) -> bool:
+        return len(self.discard_orders[player_index]) > 0
+    
+    def get_reactive_player_index_ordering(self) -> List[int]:
+        """This can be empty if everyone has safe plays."""
+        ben = None
+        for i in range(len(self.num_players) - 1):
+            player_index = (self.our_player_index + 1 + i) % self.num_players
+            if not self.has_safe_play(player_index):
+                ben = player_index
+
+        if ben is None:
+            return []
+        
+        ordering = [ben]
+        _player_index = ben
+        for i in range(len(self.num_players) - 1):
+            _player_index = (_player_index + 1) % self.num_players
+            if _player_index != self.our_player_index:
+                ordering.append(_player_index)
+        return ordering
+    
+    def get_leftmost_non_obvious_playable_human_slot(self, player_index: int) -> Optional[int]:
+        """Human slot means newest = 1, instead of oldest = 0"""
+        target_hand = self.hands[player_index]
+        leftmost_play = None
+        for i, card in enumerate(target_hand):
+            if card.order in self.all_play_orders:
+                continue
+            
+            # TODO: this is a bug that will need to be fixed eventually, but need to use filtration instead of candidates
+            if self.is_playable(self.all_candidates_list[player_index][i]):
+                continue
+
+            # TODO: if an unclued playable card is also clued in the same hand, the clued copy takes priority
+            
+            leftmost_play = len(target_hand) - i
+        return leftmost_play
+
+    def get_trash_target_human_slot(self, player_index: int) -> Optional[int]:
+        """Human slot means newest = 1, instead of oldest = 0"""
+        target_hand = self.hands[player_index]
+        leftmost_trash = None
+        for i, card in enumerate(target_hand):
+            if card.order in self.all_discard_orders:
+                continue
 
     def every_good_card_of_rank_is_playable(self, rank: int) -> bool:
-        all_touched_cards = get_all_touched_cards(RANK_CLUE, rank, self.variant_name)
+        touched_card_tuples = self.get_touched_card_tuples(RANK_CLUE, rank)
         at_least_one_card_playable = False
-        for (si, r) in all_touched_cards:
+        for (si, r) in touched_card_tuples:
             if r != rank:
                 continue
             if (si, r) not in self.playables and (si, r) not in self.trash:
@@ -92,13 +141,13 @@ class RefSieveGameState(GameState):
         player_index, i = self.order_to_index[order]
         if player_index == self.our_player_index:
             return False
-        all_touched_cards = get_all_touched_cards(clue_type, clue_value, self.variant_name)
+        touched_card_tuples = self.get_touched_card_tuples(clue_type, clue_value)
         cands = self.all_candidates_list[player_index][i]
         card = self.hands[player_index][i]
-        if card.to_tuple() in all_touched_cards:
-            cands_after_clue = cands.intersection(all_touched_cards)
+        if card.to_tuple() in touched_card_tuples:
+            cands_after_clue = cands.intersection(touched_card_tuples)
         else:
-            cands_after_clue = cands.difference(all_touched_cards)
+            cands_after_clue = cands.difference(touched_card_tuples)
         return self.is_trash(cands_after_clue)
 
     def update_play_discard_orders(self):
@@ -234,9 +283,7 @@ class RefSieveGameState(GameState):
         return None
     
     def evaluate_clue_score(self, clue_type, clue_value, target_index) -> int:
-        all_cards_touched_by_clue = get_all_touched_cards(
-            clue_type, clue_value, self.variant_name
-        )
+        touched_card_tuples = self.get_touched_card_tuples(clue_type, clue_value)
         good_card_indices = [
             i
             for i in range(len(self.hands[target_index]))
@@ -244,7 +291,7 @@ class RefSieveGameState(GameState):
         ]
         bad_cards_touched = [
             card for card in self.hands[target_index]
-            if self.is_trash_card(card) and card.to_tuple() in all_cards_touched_by_clue
+            if self.is_trash_card(card) and card.to_tuple() in touched_card_tuples
         ]
         if len(bad_cards_touched):
             score = 1000
@@ -254,14 +301,10 @@ class RefSieveGameState(GameState):
         candidates_list = self.all_candidates_list[target_index]
 
         for i in good_card_indices:
-            if self.hands[target_index][i].to_tuple() in all_cards_touched_by_clue:
-                new_candidates = candidates_list[i].intersection(
-                    all_cards_touched_by_clue
-                )
+            if self.hands[target_index][i].to_tuple() in touched_card_tuples:
+                new_candidates = candidates_list[i].intersection(touched_card_tuples)
             else:
-                new_candidates = candidates_list[i].difference(
-                    all_cards_touched_by_clue
-                )
+                new_candidates = candidates_list[i].difference(touched_card_tuples)
             score *= len(new_candidates)
 
         return score
@@ -273,30 +316,40 @@ class RefSieveGameState(GameState):
         clue_value: int,
         touched_orders: Optional[List[int]] = None
     ) -> Optional[int]:
-        all_touched_cards = get_all_touched_cards(clue_type, clue_value, self.variant_name)
+        """A return value of None signifies a lock"""
+        touched_card_tuples = self.get_touched_card_tuples(clue_type, clue_value)
         if touched_orders is not None:
             _touched_orders = touched_orders
         else:
             _touched_orders = [
                 card.order for card in self.hands[target_index]
-                if card.to_tuple() in all_touched_cards
+                if card.to_tuple() in touched_card_tuples
             ]
 
         num_cards_in_hand = len(self.hands[target_index])
-        leftmost_newly_touched = None
+        unclued_orders = [card.order for card in self.hands[target_index] if card.order in self.clued_card_orders]
+        if not len(unclued_orders):
+            raise IndentationError("Cannot call get_index_of_ref_discard_target when hand is fully clued!")
+        
+        rightmost_unclued_order = min(unclued_orders)
+        if rightmost_unclued_order in _touched_orders:
+            return None
 
-        for i, card in enumerate(self.hands[target_index]):
-            if card.order in _touched_orders and card.order not in self.clued_card_orders:
-                leftmost_newly_touched = i
-            
-        if leftmost_newly_touched is None:
-            raise BadRefSieveClue(
-                f"Invalid Ref Discard clue: {target_index} {clue_type} {clue_value}"
+        # find the leftmost card to the right of a newly touched card
+        newly_touched_indices = [
+            i for i, card in enumerate(self.hands[target_index])
+            if card.order in _touched_orders and card.order not in self.clued_card_orders
+        ]
+
+        if not len(newly_touched_indices):
+            raise IndentationError(
+                f"Invalid Ref Discard clue, no new cards are clued: {target_index} {clue_type} {clue_value}"
             )
+        leftmost_newly_touched_index = max(newly_touched_indices)
 
         for j in range(num_cards_in_hand):
             i = num_cards_in_hand - j - 1
-            if i > leftmost_newly_touched:
+            if i > leftmost_newly_touched_index:
                 continue
 
             card = self.hands[target_index][i]
@@ -317,13 +370,13 @@ class RefSieveGameState(GameState):
         clue_value: int,
         touched_orders: Optional[List[int]] = None
     ) -> int:
-        all_touched_cards = get_all_touched_cards(clue_type, clue_value, self.variant_name)
+        touched_card_tuples = self.get_touched_card_tuples(clue_type, clue_value)
         if touched_orders is not None:
             _touched_orders = touched_orders
         else:
             _touched_orders = [
                 card.order for card in self.hands[target_index]
-                if card.to_tuple() in all_touched_cards
+                if card.to_tuple() in touched_card_tuples
             ]
 
         num_cards_in_hand = len(self.hands[target_index])
@@ -333,7 +386,7 @@ class RefSieveGameState(GameState):
                 leftmost_newly_touched = i
             
         if leftmost_newly_touched is None:
-            raise BadRefSieveClue(
+            raise IndentationError(
                 f"Invalid Ref Play clue: {target_index} {clue_type} {clue_value}"
             )
 
@@ -353,17 +406,13 @@ class RefSieveGameState(GameState):
         ]
         return max(shifted_indices)
 
-    def get_touched_cards(self, clue_type: int, clue_value: int, target_index: int) -> List[Card]:
-        target_hand = self.hands[target_index]
-        all_touched_cards = get_all_touched_cards(clue_type, clue_value, self.variant_name)
-        touched_cards = [card for card in target_hand if card.to_tuple() in all_touched_cards]
-        return touched_cards
-
-    def get_ref_sieve_clues(self) -> Dict[Tuple[int, int, int], str]:
+    def get_stable_clues(self) -> Dict[Tuple[int, int, int], str]:
         # (clue_value, clue_type, target_index) -> clue_type
         result = {}
+        ordering = self.get_reactive_player_index_ordering()
+
         for target_index in range(self.num_players):
-            if target_index == self.our_player_index:
+            if len(ordering) > 0 and target_index != ordering[0]:
                 continue
             
             target_hand = self.hands[target_index]
@@ -375,11 +424,12 @@ class RefSieveGameState(GameState):
                     all_clue_values = list(range(len(color_clues)))
 
                 for clue_value in all_clue_values:
-                    all_touched_cards = get_all_touched_cards(clue_type, clue_value, self.variant_name)
+                    touched_card_tuples = self.get_touched_card_tuples(clue_type, clue_value)
                     touched_cards = self.get_touched_cards(clue_type, clue_value, target_index)
                     if not len(touched_cards):
                         continue
-
+                    
+                    # oldest to newest
                     touched_card_orders = [card.order for card in touched_cards]
                     newly_touched_cards = [card for card in touched_cards if card.order not in self.clued_card_orders]
 
@@ -395,7 +445,7 @@ class RefSieveGameState(GameState):
                             continue
 
                         candidates = self.get_candidates(c.order)
-                        new_cands = candidates.intersection(all_touched_cards)
+                        new_cands = candidates.intersection(touched_card_tuples)
                         
                         if self.is_playable(new_cands) or self.is_trash(new_cands):
                             reveals_safe_action = True
@@ -404,17 +454,12 @@ class RefSieveGameState(GameState):
                         result[(clue_type, clue_value, target_index)] = "SAFE_ACTION"
                     elif len(newly_touched_cards):
                         if clue_type == RANK_CLUE:
-                            nothing_is_trash = True
-                            for card in newly_touched_cards:
-                                if self.is_weak_trash_card(card):
-                                    nothing_is_trash = False
-
-                            if self.every_good_card_of_rank_is_playable(clue_value) and nothing_is_trash:
+                            if self.every_good_card_of_rank_is_playable(clue_value) and not self.is_weak_trash_card(newly_touched_cards[-1]):
                                 result[(clue_type, clue_value, target_index)] = "DIRECT_PLAY"
                             elif self.every_card_of_rank_is_trash(clue_value):
                                 ref_play_index = self.get_index_of_ref_play_target(target_index, clue_type, clue_value)
-                                playable_card = target_hand[ref_play_index]
-                                if self.is_playable_card(playable_card) and playable_card.to_tuple() not in self.all_play_tuples:
+                                targeted_card = target_hand[ref_play_index]
+                                if self.is_playable_card(targeted_card) and targeted_card.to_tuple() not in self.all_play_tuples:
                                     result[(clue_type, clue_value, target_index)] = "REF_PLAY"
                             else:
                                 ref_discard_index = self.get_index_of_ref_discard_target(target_index, clue_type, clue_value)
@@ -429,4 +474,40 @@ class RefSieveGameState(GameState):
                                 result[(clue_type, clue_value, target_index)] = "REF_PLAY"
 
         return result
+
+    def get_reactive_clues(self) -> Dict[Tuple[int, int, int], str]:
+        # (clue_value, clue_type, target_index) -> clue_type
+        if self.num_players > 3:
+            raise NotImplementedError
+        result = {}
+        ordering = self.get_reactive_player_index_ordering()
+
+        # TODO: response inversion
+        if not len(ordering):
+            return {}
+        
+        for target_index in [ordering[1]]:
+            if len(ordering) > 0 and target_index != ordering[0]:
+                continue
+            
+            target_hand = self.hands[target_index]
+            for clue_type in [RANK_CLUE, COLOR_CLUE]:
+                if clue_type == RANK_CLUE:
+                    all_clue_values = get_available_rank_clues(self.variant_name)
+                else:
+                    color_clues = get_available_color_clues(self.variant_name)
+                    all_clue_values = list(range(len(color_clues)))
+
+                for clue_value in all_clue_values:
+                    slots_touched = self.get_touched_slots(clue_type, clue_value, target_index)
+                    if not len(slots_touched):
+                        continue
+                    
+                    # bot -> human slot ordering: [0, 1, 2, 3, 4] -> [5, 4, 3, 2, 1]
+                    slots_touched = [len(target_hand) - x for x in slots_touched]
+                    focused_slot = (
+                        slots_touched[1] if (slots_touched[0] == 1 and len(slots_touched) > 1)
+                        else slots_touched[0]
+                    )
+
 

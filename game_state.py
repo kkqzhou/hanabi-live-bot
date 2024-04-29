@@ -501,6 +501,13 @@ def is_whiteish_rainbowy(variant_name):
     return False
 
 
+def get_random_deck(variant_name: str) -> List[Card]:
+    # usually used for testing purposes
+    cards = get_all_cards_with_multiplicity(variant_name)
+    perm = np.random.permutation(cards)
+    return [Card(order, x[0], x[1]) for order, x in enumerate(perm)]
+
+
 def get_cards_touched_dict(
     variant_name: str,
     target_hand: List[Card],
@@ -795,7 +802,7 @@ class GameState:
         )
 
     def get_clued_orders(self, player_index: int) -> List[int]:
-        # returns orders from right to left
+        """Returns orders from right to left."""
         return [
             x.order
             for x in self.hands[player_index]
@@ -804,13 +811,34 @@ class GameState:
         ]
 
     def get_unclued_orders(self, player_index: int) -> List[int]:
-        # returns orders from right to left
+        """Returns orders from right to left."""
         return [
             x.order
             for x in self.hands[player_index]
             if x.order not in self.color_clued_card_orders
             and x.order not in self.rank_clued_card_orders
         ]
+    
+    def get_touched_card_tuples(self, clue_type: int, clue_value: int) -> Set[Tuple[int, int]]:
+        return get_all_touched_cards(clue_type, clue_value, self.variant_name)
+
+    def get_touched_orders(self, clue_type: int, clue_value: int, target_index: int) -> List[int]:
+        """Ordering is oldest to newest."""
+        target_hand = self.hands[target_index]
+        all_touched_cards = get_all_touched_cards(clue_type, clue_value, self.variant_name)
+        return [card.order for card in target_hand if card.to_tuple() in all_touched_cards]
+
+    def get_touched_cards(self, clue_type: int, clue_value: int, target_index: int) -> List[Card]:
+        """Ordering is oldest to newest."""
+        target_hand = self.hands[target_index]
+        all_touched_cards = get_all_touched_cards(clue_type, clue_value, self.variant_name)
+        return [card for card in target_hand if card.to_tuple() in all_touched_cards]
+    
+    def get_touched_slots(self, clue_type: int, clue_value: int, target_index: int) -> List[int]:
+        """Index of 0 = oldest as per convention."""
+        target_hand = self.hands[target_index]
+        all_touched_cards = get_all_touched_cards(clue_type, clue_value, self.variant_name)
+        return [i for i, card in enumerate(target_hand) if card.to_tuple() in all_touched_cards]
 
     def get_all_other_players_cards(
         self, player_index=None
@@ -1269,3 +1297,33 @@ class GameState:
             self.notes[order] += " | " + _note
         else:
             self.notes[order] = _note
+
+
+if __name__ == "__main__":
+    import numpy as np
+    from conventions.reactor import ReactorGameState
+
+    np.random.seed(20000)
+    variant_name = "Prism (5 Suits)"
+    player_names = ["test0", "test1", "test2", "test3"]
+    states = {
+        player_index: ReactorGameState(variant_name, player_names, player_index)
+        for player_index, player_name in enumerate(player_names)
+    }
+    deck = get_random_deck(variant_name)
+    num_cards_per_player = {2: 5, 3: 5, 4: 4, 5: 4, 6: 3}[len(states)]
+    order = 0
+
+    for player_index, player_name in enumerate(states):
+        for i in range(num_cards_per_player):
+            card = deck.pop(0)
+            for player_iterate in states:
+                if player_iterate == player_name:
+                    states[player_iterate].handle_draw(player_index, order, -1, -1)
+                else:
+                    states[player_iterate].handle_draw(
+                        player_index, order, card.suit_index, card.rank
+                    )
+            order += 1
+
+    states[0].print()
