@@ -638,6 +638,13 @@ class GameState:
             (suit, stack + (-1 if "Reversed" in SUITS[self.variant_name][suit] else 1))
             for suit, stack in enumerate(self.stacks)
         }
+    
+    @property
+    def one_away_from_playables(self) -> Set[Tuple[int, int]]:
+        return {
+            (suit, stack + (-2 if "Reversed" in SUITS[self.variant_name][suit] else 2))
+            for suit, stack in enumerate(self.stacks)
+        }
 
     @property
     def score_pct(self) -> float:
@@ -754,6 +761,10 @@ class GameState:
             for i, card in enumerate(hand):
                 result[card.order] = (player_index, i)
         return result
+
+    def get_next_playable_card_tuple(self, suit_index: int) -> Tuple[int, int]:
+        incr = (-1 if "Reversed" in SUITS[self.variant_name][suit_index] else 1)
+        return (suit_index, self.stacks[suit_index] + incr)
 
     def get_candidates(self, order) -> Optional[Set[Tuple[int, int]]]:
         player_index, i = self.order_to_index.get(order, (None, None))
@@ -1157,13 +1168,13 @@ class GameState:
         self.process_visible_cards()
         return new_card
 
-    def handle_play(self, player_index, order, suit_index, rank):
+    def handle_play(self, player_index: int, order: int, suit_index: int, rank: int):
         self.remove_card_from_hand(player_index, order)
         self.stacks[suit_index] = rank
         self.process_visible_cards()
         return Card(order, suit_index, rank)
 
-    def handle_discard(self, player_index, order, suit_index, rank):
+    def handle_discard(self, player_index: int, order: int, suit_index: int, rank: int):
         self.remove_card_from_hand(player_index, order)
         if (suit_index, rank) not in self.discards:
             self.discards[(suit_index, rank)] = 1
@@ -1171,6 +1182,9 @@ class GameState:
             self.discards[(suit_index, rank)] += 1
         self.process_visible_cards()
         return Card(order, suit_index, rank)
+    
+    def handle_strike(self, order: int):
+        pass
 
     def super_handle_clue(
         self,
@@ -1303,9 +1317,9 @@ if __name__ == "__main__":
     import numpy as np
     from conventions.reactor import ReactorGameState
 
-    np.random.seed(20000)
-    variant_name = "Prism (5 Suits)"
-    player_names = ["test0", "test1", "test2", "test3"]
+    np.random.seed(19991)
+    variant_name = "No Variant"
+    player_names = ["test0", "test1", "test2"]
     states = {
         player_index: ReactorGameState(variant_name, player_names, player_index)
         for player_index, player_name in enumerate(player_names)
@@ -1326,4 +1340,16 @@ if __name__ == "__main__":
                     )
             order += 1
 
-    states[0].print()
+    self = states[0]
+    self.print()
+    print(self.get_reactive_clues())
+    states[1].handle_clue(0, 2, RANK_CLUE, 2, [11, 13])
+    states[2].handle_clue(0, 2, RANK_CLUE, 2, [11, 13])
+    print(1, states[1].unresolved_reactions, states[1].play_orders)
+    print(2, states[2].unresolved_reactions, states[2].play_orders)
+
+    states[1].handle_play(1, 9, 0, 1)
+    states[2].handle_play(1, 9, 0, 1)
+    states[2].print()
+    print(1, states[1].unresolved_reactions, states[1].play_orders)
+    print(2, states[2].unresolved_reactions, states[2].play_orders)

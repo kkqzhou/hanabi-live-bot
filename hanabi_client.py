@@ -39,6 +39,7 @@ class HanabiClient:
             "encoderv2": EncoderV2GameState,
             "hgroup": HGroupGameState,
             "refsieve": RefSieveGameState,
+            "reactor": ReactorGameState,
         }[self.convention_name]
         self.disconnect_on_game_end = disconnect_on_game_end
         self.table_name = table_name
@@ -412,6 +413,7 @@ class HanabiClient:
 
         elif data["type"] == "strike":
             state.bombs = data["num"]
+            state.handle_strike(data["order"])
 
         elif data["type"] == "status":
             state.clue_tokens = data["clues"]
@@ -644,12 +646,18 @@ class HanabiClient:
         self.clue(state.next_player_index, RANK_CLUE, burn_clue_card.rank, table_id)
 
     def reactor(self, state: ReactorGameState, table_id: int):
-        # (clue_value, clue_type, target_index) -> clue_type
         stable_clues = state.get_stable_clues()
         reactive_clues = state.get_reactive_clues()
+        print('------------------')
         print('Players play/discard/chop:')
         for pindex in range(state.num_players):
             print(pindex, state.play_orders[pindex], state.discard_orders[pindex], state.get_chop_order(pindex))
+        print('Play orders')
+        print(state.play_orders)
+        print('Discard orders')
+        print(state.discard_orders)
+        print('Unresolved reactions')
+        print(state.unresolved_reactions)
 
         print('All stable clues:')
         for x, y in stable_clues.items():
@@ -660,142 +668,85 @@ class HanabiClient:
         for x, y in reactive_clues.items():
             print(x, y)
 
-        ben = state.get_first_reacter_player_index()
-        if ben is None:
-            # All players have safe plays
-            if len(state.our_play_orders):
-                self.play(state.our_play_orders[0], table_id)
-                return
-            
-            if len(state.our_discard_orders) and (state.clue_tokens < 8):
-                self.discard(state.our_discard_orders[0], table_id)
-                return
-            
-            if (state.clue_tokens < 8):
-                chop_order = state.get_chop_order(state.our_player_index)
-                if chop_order is not None:
-                    self.discard(chop_order, table_id)
+        print('------------------')
+
+        # TODO: fold into a function
+        ur = state.unresolved_reactions[state.our_player_index]
+        if ur is not None:
+            target_index = ur.ordering[1]
+            target_orders = ur.player_slot_orders[target_index]
+            reacter_orders = ur.player_slot_orders[state.our_player_index]
+            pslot = state.get_reactive_playable_human_slot(target_index, ur.current_play_orders)
+            tslot = state.get_reactive_trash_human_slot(target_index, ur.current_clued_orders)
+            print(f'Responding to reactive where {target_index} is target')
+            print(f'pslot = {pslot}, tslot = {tslot}')
+
+            if ur.play_parity == 0:
+                if pslot is not None:
+                    reacter_slot = (ur.focused_slot - pslot - 1) % len(target_orders) + 1
+                    order_to_play = reacter_orders[reacter_slot - 1]
+                    print(f'!!1 Playing slot {reacter_slot}')
+                    self.play(order_to_play, table_id)
+                    state.unresolved_reactions[state.our_player_index] = None
                     return
 
-            # TODO: come up with better fillin/stalling actions at 8 clues
-            self.play(state.our_hand[-1].order, table_id)
-            return
-        
-        carla = (ben + 1) % state.num_players
-        if carla == state.our_player_index:
-            carla += 1
-        ben_chop_order = state.get_chop_order(ben)
-
-        if ben_chop_order is not None:
-            ben_chop_card = state.get_card(ben_chop_order)
-            urgent_card_on_bobs_chop = (state.is_playable_card(ben_chop_card) and ben_chop_order not in state.clued_card_orders) or state.is_critical_card(ben_chop_order)
-            
-            if (state.clue_tokens >= 1) and (state.num_cards_in_deck >= 2) and urgent_card_on_bobs_chop:
-                print('Bob has a crit/playable on chop and no safe actions!')
-                play_clues_to_bob = [x for x, y in clues_to_bob.items() if y in {"DIRECT_PLAY", "REF_PLAY"}]
-                safe_action_clues_to_bob = [x for x, y in clues_to_bob.items() if y in {"SAFE_ACTION"}]
-                discard_clues_to_bob = [x for x, y in clues_to_bob.items() if y in {"REF_DISCARD"}]
-                if len(play_clues_to_bob):
-                    play_clues_ranked = sorted(
-                        play_clues_to_bob, key=lambda x: state.evaluate_clue_score(x[0], x[1], x[2])
-                    )
-                    for clue_type, clue_value, target_index in play_clues_ranked:
-                        self.clue(target_index, clue_type, clue_value, table_id)
-                        return
-
-                if len(safe_action_clues_to_bob):
-                    clue_type, clue_value, _ = safe_action_clues_to_bob[0]
-                    self.clue(bob, clue_type, clue_value, table_id)
+                for reacter_slot in [1,2,3,4,5]:
+                    order_to_play = reacter_orders[reacter_slot - 1]
+                    order_to_play_candidates = state.get_candidates(order_to_play)
+                    fslot = (ur.focused_slot - reacter_slot - 1) % len(target_orders) + 1
+                    fcard = state.hands[target_index][-fslot]
+                    if fcard.to_tuple() in state.one_away_from_playables:
+                        if state.get_next_playable_card_tuple(fcard.suit_index) not in order_to_play_candidates:
+                            continue
+                        else:
+                            print(f'!!2 Playing slot {reacter_slot}')
+                            self.play(order_to_play, table_id)
+                            state.unresolved_reactions[state.our_player_index] = None
+                            return
+                    
+            elif ur.play_parity == 1:
+                if pslot is not None:
+                    reacter_slot = (ur.focused_slot - pslot - 1) % len(target_orders) + 1
+                    order_to_discard = reacter_orders[reacter_slot - 1]
+                    print(f'!!3 Discarding slot {reacter_slot}')
+                    self.discard(order_to_discard, table_id)
+                    state.unresolved_reactions[state.our_player_index] = None
                     return
                 
-                if len(discard_clues_to_bob):
-                    # find a clue that gets rid of trash
-                    for clue_type, clue_value, _ in discard_clues_to_bob:
-                        discard_index = state.get_index_of_ref_discard_target(bob, clue_type, clue_value)
-                        if discard_index is None:
-                            continue
-
-                        discard_target_card = state.hands[bob][discard_index]
-                        touched_cards = state.get_touched_cards(clue_type, clue_value, bob)
-                        newly_touched_cards = [card for card in touched_cards if card.order not in state.clued_card_orders]
-                        does_not_bad_touch = True
-                        for card in newly_touched_cards:
-                            if state.is_weak_trash_card(card):
-                                does_not_bad_touch = False
-                        if does_not_bad_touch and state.is_weak_trash_card(discard_target_card):
-                            print('Found kt to remove in Bobs hand!')
-                            self.clue(bob, clue_type, clue_value, table_id)
-                            return
-                        
-                    # otherwise find a clue that doesn't get rid of a crit
-                    for clue_type, clue_value, _ in discard_clues_to_bob:
-                        discard_index = state.get_index_of_ref_discard_target(bob, clue_type, clue_value)
-                        if discard_index is None:
-                            continue
-
-                        discard_target_card = state.hands[bob][discard_index]
-                        if not state.is_critical_card(discard_target_card):
-                            print('No kt to remove in Bobs hand, saving crits instead')
-                            self.clue(bob, clue_type, clue_value, table_id)
-                            return
+                if tslot is not None:
+                    reacter_slot = (ur.focused_slot - tslot - 1) % len(target_orders) + 1
+                    order_to_play = reacter_orders[reacter_slot - 1]
+                    print(f'!!4 Playing slot {reacter_slot}')
+                    self.play(order_to_play, table_id)
+                    state.unresolved_reactions[state.our_player_index] = None
+                    return
 
         if len(state.our_play_orders):
+            print(f'!!5 Playing order {state.our_play_orders[0]}')
             self.play(state.our_play_orders[0], table_id)
             return
-        
-        play_clues = [x for x, y in ref_sieve_clues.items() if y in {"DIRECT_PLAY", "REF_PLAY"}]
-        safe_action_clues = [x for x, y in ref_sieve_clues.items() if y in {"SAFE_ACTION"}]
-        discard_clues = [x for x, y in ref_sieve_clues.items() if y in {"REF_DISCARD"}]
-        lock_clues = [x for x, y in ref_sieve_clues.items() if y in {"LOCK"}]
-        if (state.clue_tokens >= 2):
-            print('Give some sort of useful clue')
-
-            if len(play_clues):
-                play_clues_ranked = sorted(
-                    play_clues, key=lambda x: state.evaluate_clue_score(x[0], x[1], x[2])
-                )
-                for clue_type, clue_value, target_index in play_clues_ranked:
-                    self.clue(target_index, clue_type, clue_value, table_id)
-                    return
-            
-            if len(safe_action_clues):
-                for clue_type, clue_value, target_index in safe_action_clues:
-                    touched_cards = state.get_touched_cards(clue_type, clue_value, target_index)
-                    newly_touched_cards = [card for card in touched_cards if card.order not in state.clued_card_orders]
-                    for card in newly_touched_cards:
-                        if state.is_weak_trash_card(card):
-                            continue
-                        
-                        self.clue(target_index, clue_type, clue_value, table_id)
-                        return
-            
-            if len(discard_clues):
-                players_with_good_chops = [
-                    pindex for pindex in range(state.num_players)
-                    if pindex != state.our_player_index
-                    and state.get_chop_order(pindex) is not None
-                    and not state.is_weak_trash_card(state.get_card(state.get_chop_order(pindex)))
-                ]
-                good_discard_clues = [x for x in discard_clues if x[-1] in players_with_good_chops]
-                for clue_type, clue_value, target_index in good_discard_clues:
-                    discard_index = state.get_index_of_ref_discard_target(target_index, clue_type, clue_value)
-                    if discard_index is None:
-                        continue
-
-                    discard_target_card = state.hands[target_index][discard_index]
-                    touched_cards = state.get_touched_cards(clue_type, clue_value, target_index)
-                    newly_touched_cards = [card for card in touched_cards if card.order not in state.clued_card_orders]
-                    does_not_bad_touch = True
-                    for card in newly_touched_cards:
-                        if state.is_weak_trash_card(card):
-                            does_not_bad_touch = False
-                    if does_not_bad_touch and state.is_weak_trash_card(discard_target_card):
-                        self.clue(target_index, clue_type, clue_value, table_id)
-                        return
 
         if len(state.our_discard_orders) and (state.clue_tokens < 8):
+            print(f'!!6 Discarding order {state.our_discard_orders[0]}')
             self.discard(state.our_discard_orders[0], table_id)
             return
+
+        if len(reactive_clues) and state.clue_tokens >= 2:
+            for (clue_value, clue_type, target_index), clue_str in reactive_clues.items():
+                if clue_str in {'2P0D_PLAY', '2P0D_FINESSE'}:
+                    self.clue(target_index, clue_type, clue_value, table_id)
+                    return
+                
+            for (clue_value, clue_type, target_index), clue_str in reactive_clues.items():
+                if clue_str in {'1P1D_DISCARD', '1P1D_PLAY'}:
+                    self.clue(target_index, clue_type, clue_value, table_id)
+                    return
+                
+        if len(stable_clues) and state.clue_tokens >= 1:
+            for (clue_value, clue_type, target_index), clue_str in stable_clues.items():
+                if clue_str != 'LOCK':
+                    self.clue(target_index, clue_type, clue_value, table_id)
+                    return
         
         if (state.clue_tokens < 8):
             chop_order = state.get_chop_order(state.our_player_index)
