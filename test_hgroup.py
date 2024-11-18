@@ -1,10 +1,11 @@
-from h_group import HGroupGameState, FinesseNode
+from conventions.h_group import HGroupGameState, FinesseNode
 from game_state import RANK_CLUE, COLOR_CLUE
 from test_functions import check_eq
 from test_game_state import create_game_states, get_deck_from_tuples
 import datetime as dt
 from typing import Dict
 
+# WIPWIPWIPWIP
 
 def test_clue_focus():
     variant_name = "No Variant"

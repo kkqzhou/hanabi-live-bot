@@ -501,6 +501,13 @@ def is_whiteish_rainbowy(variant_name):
     return False
 
 
+def get_random_deck(variant_name: str) -> List[Card]:
+    # usually used for testing purposes
+    cards = get_all_cards_with_multiplicity(variant_name)
+    perm = np.random.permutation(cards)
+    return [Card(order, x[0], x[1]) for order, x in enumerate(perm)]
+
+
 def get_cards_touched_dict(
     variant_name: str,
     target_hand: List[Card],
@@ -590,12 +597,14 @@ class GameState:
         # possibilities include only positive/negative information
         # candidates further narrow possibilities based on conventions
         # a "filtration" refers to a global information empathy system
-        self.all_base_filtrations_list: Dict[int, List[Set[Tuple[int, int]]]] = {}
+        self.all_filtrations: Dict[str, Dict[int, List[Set[Tuple[int, int]]]]] = {
+            "base": {}
+        }
         self.all_possibilities_list: Dict[int, List[Set[Tuple[int, int]]]] = {}
         self.all_candidates_list: Dict[int, List[Set[Tuple[int, int]]]] = {}
         for i in range(len(player_names)):
             self.hands[i] = []
-            self.all_base_filtrations_list[i] = []
+            self.all_base_filtrations[i] = []
             self.all_possibilities_list[i] = []
             self.all_candidates_list[i] = []
 
@@ -612,6 +621,10 @@ class GameState:
         self.notes: Dict[int, str] = {}
 
     @property
+    def all_base_filtrations(self) -> Dict[int, List[Set[Tuple[int, int]]]]:
+        return self.all_filtrations["base"]
+
+    @property
     def num_players(self) -> int:
         return len(self.player_names)
 
@@ -623,6 +636,13 @@ class GameState:
     def playables(self) -> Set[Tuple[int, int]]:
         return {
             (suit, stack + (-1 if "Reversed" in SUITS[self.variant_name][suit] else 1))
+            for suit, stack in enumerate(self.stacks)
+        }
+    
+    @property
+    def one_away_from_playables(self) -> Set[Tuple[int, int]]:
+        return {
+            (suit, stack + (-2 if "Reversed" in SUITS[self.variant_name][suit] else 2))
             for suit, stack in enumerate(self.stacks)
         }
 
@@ -723,8 +743,8 @@ class GameState:
         return self.all_possibilities_list[self.our_player_index]
 
     @property
-    def our_base_filtration(self) -> List[Set[Tuple[int, int]]]:
-        return self.all_base_filtrations_list[self.our_player_index]
+    def our_base_filtrations(self) -> List[Set[Tuple[int, int]]]:
+        return self.all_base_filtrations[self.our_player_index]
 
     @property
     def our_num_crits(self) -> int:
@@ -742,6 +762,10 @@ class GameState:
                 result[card.order] = (player_index, i)
         return result
 
+    def get_next_playable_card_tuple(self, suit_index: int) -> Tuple[int, int]:
+        incr = (-1 if "Reversed" in SUITS[self.variant_name][suit_index] else 1)
+        return (suit_index, self.stacks[suit_index] + incr)
+
     def get_candidates(self, order) -> Optional[Set[Tuple[int, int]]]:
         player_index, i = self.order_to_index.get(order, (None, None))
         if player_index is None:
@@ -754,11 +778,11 @@ class GameState:
             return None
         return self.all_possibilities_list[player_index][i]
 
-    def get_base_filtration(self, order) -> Optional[Set[Tuple[int, int]]]:
+    def get_base_filtrations(self, order) -> Optional[Set[Tuple[int, int]]]:
         player_index, i = self.order_to_index.get(order, (None, None))
         if player_index is None:
             return None
-        return self.all_base_filtrations_list[player_index][i]
+        return self.all_base_filtrations[player_index][i]
 
     def get_card(self, order) -> Card:
         player_index, i = self.order_to_index[order]
@@ -789,7 +813,7 @@ class GameState:
         )
 
     def get_clued_orders(self, player_index: int) -> List[int]:
-        # returns orders from right to left
+        """Returns orders from right to left."""
         return [
             x.order
             for x in self.hands[player_index]
@@ -798,13 +822,34 @@ class GameState:
         ]
 
     def get_unclued_orders(self, player_index: int) -> List[int]:
-        # returns orders from right to left
+        """Returns orders from right to left."""
         return [
             x.order
             for x in self.hands[player_index]
             if x.order not in self.color_clued_card_orders
             and x.order not in self.rank_clued_card_orders
         ]
+    
+    def get_touched_card_tuples(self, clue_type: int, clue_value: int) -> Set[Tuple[int, int]]:
+        return get_all_touched_cards(clue_type, clue_value, self.variant_name)
+
+    def get_touched_orders(self, clue_type: int, clue_value: int, target_index: int) -> List[int]:
+        """Ordering is oldest to newest."""
+        target_hand = self.hands[target_index]
+        all_touched_cards = get_all_touched_cards(clue_type, clue_value, self.variant_name)
+        return [card.order for card in target_hand if card.to_tuple() in all_touched_cards]
+
+    def get_touched_cards(self, clue_type: int, clue_value: int, target_index: int) -> List[Card]:
+        """Ordering is oldest to newest."""
+        target_hand = self.hands[target_index]
+        all_touched_cards = get_all_touched_cards(clue_type, clue_value, self.variant_name)
+        return [card for card in target_hand if card.to_tuple() in all_touched_cards]
+    
+    def get_touched_slots(self, clue_type: int, clue_value: int, target_index: int) -> List[int]:
+        """Index of 0 = oldest as per convention."""
+        target_hand = self.hands[target_index]
+        all_touched_cards = get_all_touched_cards(clue_type, clue_value, self.variant_name)
+        return [i for i, card in enumerate(target_hand) if card.to_tuple() in all_touched_cards]
 
     def get_all_other_players_cards(
         self, player_index=None
@@ -1107,7 +1152,7 @@ class GameState:
         del hand[card_index]
         del self.all_candidates_list[player_index][card_index]
         del self.all_possibilities_list[player_index][card_index]
-        del self.all_base_filtrations_list[player_index][card_index]
+        del self.all_base_filtrations[player_index][card_index]
         return card
 
     def handle_draw(self, player_index, order, suit_index, rank):
@@ -1117,19 +1162,19 @@ class GameState:
         self.all_possibilities_list[player_index].append(
             get_all_cards(self.variant_name)
         )
-        self.all_base_filtrations_list[player_index].append(
+        self.all_base_filtrations[player_index].append(
             get_all_cards(self.variant_name)
         )
         self.process_visible_cards()
         return new_card
 
-    def handle_play(self, player_index, order, suit_index, rank):
+    def handle_play(self, player_index: int, order: int, suit_index: int, rank: int):
         self.remove_card_from_hand(player_index, order)
         self.stacks[suit_index] = rank
         self.process_visible_cards()
         return Card(order, suit_index, rank)
 
-    def handle_discard(self, player_index, order, suit_index, rank):
+    def handle_discard(self, player_index: int, order: int, suit_index: int, rank: int):
         self.remove_card_from_hand(player_index, order)
         if (suit_index, rank) not in self.discards:
             self.discards[(suit_index, rank)] = 1
@@ -1137,6 +1182,9 @@ class GameState:
             self.discards[(suit_index, rank)] += 1
         self.process_visible_cards()
         return Card(order, suit_index, rank)
+    
+    def handle_strike(self, order: int):
+        pass
 
     def super_handle_clue(
         self,
@@ -1159,7 +1207,7 @@ class GameState:
         touched_cards = []
         candidates_list = self.all_candidates_list[target_index]
         poss_list = self.all_possibilities_list[target_index]
-        base_filt_list = self.all_base_filtrations_list[target_index]
+        base_filt_list = self.all_base_filtrations[target_index]
 
         for i, card in enumerate(self.hands[target_index]):
             if card.order in card_orders:
@@ -1263,3 +1311,45 @@ class GameState:
             self.notes[order] += " | " + _note
         else:
             self.notes[order] = _note
+
+
+if __name__ == "__main__":
+    import numpy as np
+    from conventions.reactor import ReactorGameState
+
+    np.random.seed(19991)
+    variant_name = "No Variant"
+    player_names = ["test0", "test1", "test2"]
+    states = {
+        player_index: ReactorGameState(variant_name, player_names, player_index)
+        for player_index, player_name in enumerate(player_names)
+    }
+    deck = get_random_deck(variant_name)
+    num_cards_per_player = {2: 5, 3: 5, 4: 4, 5: 4, 6: 3}[len(states)]
+    order = 0
+
+    for player_index, player_name in enumerate(states):
+        for i in range(num_cards_per_player):
+            card = deck.pop(0)
+            for player_iterate in states:
+                if player_iterate == player_name:
+                    states[player_iterate].handle_draw(player_index, order, -1, -1)
+                else:
+                    states[player_iterate].handle_draw(
+                        player_index, order, card.suit_index, card.rank
+                    )
+            order += 1
+
+    self = states[0]
+    self.print()
+    print(self.get_reactive_clues())
+    states[1].handle_clue(0, 2, RANK_CLUE, 2, [11, 13])
+    states[2].handle_clue(0, 2, RANK_CLUE, 2, [11, 13])
+    print(1, states[1].unresolved_reactions, states[1].play_orders)
+    print(2, states[2].unresolved_reactions, states[2].play_orders)
+
+    states[1].handle_play(1, 9, 0, 1)
+    states[2].handle_play(1, 9, 0, 1)
+    states[2].print()
+    print(1, states[1].unresolved_reactions, states[1].play_orders)
+    print(2, states[2].unresolved_reactions, states[2].play_orders)

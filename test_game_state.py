@@ -1,16 +1,9 @@
 import game_state
-from game_state import COLOR_CLUE, RANK_CLUE, Card, GameState, get_all_cards
+from game_state import COLOR_CLUE, RANK_CLUE, Card, GameState, get_all_cards, get_random_deck
 from test_functions import all_rank, all_suit, check_eq
 import numpy as np
 import datetime as dt
 from typing import List, Tuple
-
-
-def get_random_deck(variant_name: str):
-    # usually used for testing purposes
-    cards = game_state.get_all_cards_with_multiplicity(variant_name)
-    perm = np.random.permutation(cards)
-    return [Card(order, x[0], x[1]) for order, x in enumerate(perm)]
 
 
 def get_deck_from_tuples(tups: List[Tuple[int, int]]):

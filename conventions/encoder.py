@@ -445,8 +445,8 @@ def get_special_hat_clues_dict(variant_name: str):
             base_dct[var] = {
                 0: [(COLOR_CLUE, 0), (RANK_CLUE, 1)],
                 1: [(COLOR_CLUE, 1), (RANK_CLUE, 2), (RANK_CLUE, 3)],
-                2: [(COLOR_CLUE, 2), (RANK_CLUE, 4), (RANK_CLUE, 5)],
-                3: [(COLOR_CLUE, 3), (COLOR_CLUE, 4)],
+                2: [(COLOR_CLUE, 3), (RANK_CLUE, 4), (RANK_CLUE, 5)],
+                3: [(COLOR_CLUE, 2), (COLOR_CLUE, 4)],
             }
         elif len(avail_color_clues) == 6:
             base_dct[var] = {
@@ -1003,13 +1003,14 @@ class EncoderV2GameState(BaseEncoderGameState):
         super().__init__(variant_name, player_names, our_player_index, get_v2_mod_table)
         self.ambiguous_residue_orders: Set[int] = set()
         self.last_hat_clue_notes: Dict[int, Set[Tuple[int, int]]] = {}
+        self.all_encoder_filtrations_list: Dict[int, List[Set[Tuple[int, int]]]] = {}
+        for i in range(len(player_names)):
+            self.all_encoder_filtrations_list[i] = []
 
     @property
     def should_interpret_hat_clue(self) -> bool:
         starting_eff = get_starting_efficiency(self.num_players, self.variant_name)
-        hard_var1 = (self.num_players < 5) and starting_eff >= 1.4
-        hard_var2 = (self.num_players >= 5) and starting_eff >= 1.5
-        if self.clue_tokens == 8 and not hard_var1 and not hard_var2:
+        if self.clue_tokens == 8 and starting_eff < 1.36:
             return False
 
         good_cards_remaining = {
@@ -1135,7 +1136,7 @@ class EncoderV2GameState(BaseEncoderGameState):
                 in_base_filtration = {
                     x
                     for x in fillin_candidates
-                    if x in self.all_base_filtrations_list[player_index][i]
+                    if x in self.all_base_filtrations[player_index][i]
                 }
                 self.ambiguous_residue_orders.remove(hat_clue_target.order)
             else:
@@ -1146,7 +1147,7 @@ class EncoderV2GameState(BaseEncoderGameState):
                 in_base_filtration = {
                     x
                     for x in residue_to_identities[other_res]
-                    if x in self.all_base_filtrations_list[player_index][i]
+                    if x in self.all_base_filtrations[player_index][i]
                 }
 
             nonglobal_candidates = self.get_nonglobal_candidates(
@@ -1154,7 +1155,7 @@ class EncoderV2GameState(BaseEncoderGameState):
             )
             print(
                 f"P{player_index} {i} BASE FILTRATION",
-                sorted(self.all_base_filtrations_list[player_index][i]),
+                sorted(self.all_base_filtrations[player_index][i]),
             )
             note_candidates = in_base_filtration.union(nonglobal_candidates)
             self.last_hat_clue_notes[hat_clue_target.order] = note_candidates
@@ -1207,7 +1208,7 @@ class EncoderV2GameState(BaseEncoderGameState):
                 print(f"Fill-in candidates: {fillin_candidates}")
                 new_candidates = my_candidates.intersection(fillin_candidates)
                 my_in_base_filtration = {
-                    x for x in fillin_candidates if x in self.our_base_filtration[my_i]
+                    x for x in fillin_candidates if x in self.our_base_filtrations[my_i]
                 }
                 self.ambiguous_residue_orders.remove(my_hat_target.order)
             else:
@@ -1218,13 +1219,13 @@ class EncoderV2GameState(BaseEncoderGameState):
                 my_in_base_filtration = {
                     x
                     for x in residue_to_identities[my_residue]
-                    if x in self.our_base_filtration[my_i]
+                    if x in self.our_base_filtrations[my_i]
                 }
 
             my_nonglobal_candidates = self.get_nonglobal_candidates(
                 self.our_player_index, my_in_base_filtration, new_candidates
             )
-            print(f"MY{my_i} BASE FILTRATION", sorted(self.our_base_filtration[my_i]))
+            print(f"MY{my_i} BASE FILTRATION", sorted(self.our_base_filtrations[my_i]))
             my_note_candidates = my_in_base_filtration.union(my_nonglobal_candidates)
             self.last_hat_clue_notes[my_hat_target.order] = my_note_candidates
             assert not len(new_candidates.difference(my_note_candidates))
@@ -1252,7 +1253,7 @@ class EncoderV2GameState(BaseEncoderGameState):
             player_index, i = order_to_index[order]
             cands = self.all_candidates_list[player_index][i]
             last_hat_clue_notes = self.last_hat_clue_notes[order]
-            base_filtration = self.all_base_filtrations_list[player_index][i]
+            base_filtration = self.all_base_filtrations[player_index][i]
             nonglobal_cands = self.get_nonglobal_candidates(
                 player_index, last_hat_clue_notes.intersection(base_filtration), cands
             )
