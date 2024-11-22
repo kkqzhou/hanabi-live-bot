@@ -386,19 +386,19 @@ class HanabiClient:
             )
 
         elif data["type"] == "play":
-            state.print()
+            # state.print()
             state.handle_play(
                 data["playerIndex"], data["order"], data["suitIndex"], data["rank"]
             )
 
         elif data["type"] == "discard":
-            state.print()
+            # state.print()
             state.handle_discard(
                 data["playerIndex"], data["order"], data["suitIndex"], data["rank"]
             )
 
         elif data["type"] == "clue":
-            state.print()
+            # state.print()
             state.handle_clue(
                 data["giver"],
                 data["target"],
@@ -410,6 +410,7 @@ class HanabiClient:
         elif data["type"] == "turn":
             state.turn = data["num"]
             state.current_player_index = data["currentPlayerIndex"]
+            state.print()
 
         elif data["type"] == "strike":
             state.bombs = data["num"]
@@ -441,6 +442,9 @@ class HanabiClient:
         print("Connected: " + str(data))
         self.everyone_connected = sum(data["list"]) == len(data["list"])
         print("self.everyone_connected = " + str(self.everyone_connected))
+        state = self.games[data["tableID"]]
+        if state.turn == 0 and self.everyone_connected:
+            state.print()
 
     def clock(self, data):
         """
@@ -660,13 +664,13 @@ class HanabiClient:
         print(state.unresolved_reactions)
 
         print('All stable clues:')
-        for x, y in stable_clues.items():
+        for (clue_value, clue_type, target_index), y in stable_clues.items():
             assert y in {"SAFE_ACTION", "DIRECT_PLAY", "REF_PLAY", "REF_DISCARD", "LOCK"}
-            print(x, y)
+            print("COLOR" if clue_type == COLOR_CLUE else "RANK", clue_value, 'to', target_index, ':', y)
 
         print('All reactive clues:')
-        for x, y in reactive_clues.items():
-            print(x, y)
+        for (clue_value, clue_type, target_index), y in reactive_clues.items():
+            print("COLOR" if clue_type == COLOR_CLUE else "RANK", clue_value, 'to', target_index, ':', y)
 
         print('------------------')
 
@@ -676,8 +680,8 @@ class HanabiClient:
             target_index = ur.ordering[1]
             target_orders = ur.player_slot_orders[target_index]
             reacter_orders = ur.player_slot_orders[state.our_player_index]
-            pslot = state.get_reactive_playable_human_slot(target_index, ur.current_play_orders)
-            tslot = state.get_reactive_trash_human_slot(target_index, ur.current_clued_orders)
+            pslot = ur.get_reactive_playable_human_slot()
+            tslot = ur.get_reactive_trash_human_slot()
             print(f'Responding to reactive where {target_index} is target')
             print(f'pslot = {pslot}, tslot = {tslot}')
 
@@ -690,7 +694,7 @@ class HanabiClient:
                     state.unresolved_reactions[state.our_player_index] = None
                     return
 
-                for reacter_slot in [1,2,3,4,5]:
+                for reacter_slot in [1,5,4,3,2]:
                     order_to_play = reacter_orders[reacter_slot - 1]
                     order_to_play_candidates = state.get_candidates(order_to_play)
                     fslot = (ur.focused_slot - reacter_slot - 1) % len(target_orders) + 1

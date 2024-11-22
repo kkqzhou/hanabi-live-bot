@@ -508,6 +508,10 @@ def get_random_deck(variant_name: str) -> List[Card]:
     return [Card(order, x[0], x[1]) for order, x in enumerate(perm)]
 
 
+def get_deck_from_tuples(tuples: List[Tuple[int, int]]):
+    return [Card(order, x[0], x[1]) for order, x in enumerate(tuples)]
+
+
 def get_cards_touched_dict(
     variant_name: str,
     target_hand: List[Card],
@@ -787,13 +791,15 @@ class GameState:
     def get_card(self, order) -> Card:
         player_index, i = self.order_to_index[order]
         return self.hands[player_index][i]
-
+    
+    # TODO: split this out into a non class function
     def is_playable(self, candidates: Set[Tuple[int, int]]) -> bool:
         return not len(candidates.difference(self.playables)) and len(candidates)
 
     def is_playable_card(self, card: Card) -> bool:
         return (card.suit_index, card.rank) in self.playables
 
+    # TODO: split this out into a non class function
     def is_trash(self, candidates: Set[Tuple[int, int]]) -> bool:
         return not len(candidates.difference(self.trash)) and len(candidates)
 
@@ -1082,61 +1088,70 @@ class GameState:
                     for i, suit_name in enumerate(SUITS[self.variant_name])
                 ]
             )
-            + "\n"
         )
-
-        output += "\n"
         for i, name in enumerate(self.player_names):
-            candidates_list = self.all_candidates_list[i]
-            poss_list = self.all_possibilities_list[i]
-            output += (
-                name
-                + "\nOrders: "
-                + ", ".join([str(card.order) for card in reversed(self.hands[i])])
-            )
-            output += "\nNotes: " + ", ".join(
+            output += f"\nNotes {name}: " + ", ".join(
                 [
                     "'" + self.notes.get(card.order, "") + "'"
                     for card in reversed(self.hands[i])
                 ]
             )
-            output += get_candidates_list_str(
+
+        output += "\n\n"
+        num_cards_per_hand = max(len(x) for x in self.hands.values())
+        width_per_hand = num_cards_per_hand * (2 + len(self.stacks)) + 2
+        card_rows = [""] * 10
+        card_rows[0] = "{x:{width}}".format(x="DCs", width=2 + len(self.stacks))
+        card_rows[1] = "{x:{width}}".format(x="", width=2 + len(self.stacks))
+        for rank in range(1, 6):
+            discard_row = ""
+            for suit_index, suit in enumerate(SUITS[self.variant_name]):
+                num_discards = self.discards.get((suit_index, rank), 0)
+                discard_row += str(num_discards) if num_discards > 0 else "."
+            card_rows[1+rank] = "{x:{width}}".format(x=discard_row, width=2 + len(self.stacks))
+
+        for i, name in enumerate(self.player_names):
+            candidates_list = self.all_candidates_list[i]
+            poss_list = self.all_possibilities_list[i]
+            card_rows[0] += "{x:{width}}".format(x="  " + name, width=width_per_hand)
+            orders_str = "Orders: " + ", ".join([str(card.order) for card in reversed(self.hands[i])])
+            card_rows[1] += "{x:{width}}".format(x="  " + orders_str, width=width_per_hand)
+            first_segment = 2
+            candidates_list_str = get_candidates_list_str(
                 list(reversed(candidates_list)),
                 self.variant_name,
                 list(reversed(self.hands[i])),
                 list(reversed(poss_list)),
-            )
-            output += "\n  "
+            ).strip("\n").split("\n")
+            for j, cands_row_str in enumerate(candidates_list_str):
+                card_rows[first_segment+j] += "{x:{width}}".format(x=cands_row_str, width=width_per_hand)
+
+            second_segment = first_segment+len(candidates_list_str)
+
+            cluedness_row = (" " * (4 + len(self.stacks))) if i == 0 else "  "
             for card in reversed(self.hands[i]):
                 if (
                     card.order in self.rank_clued_card_orders
                     and card.order in self.color_clued_card_orders
                 ):
-                    output += "+"
+                    cluedness_row += "+"
                 elif card.order in self.rank_clued_card_orders:
-                    output += "-"
+                    cluedness_row += "-"
                 elif card.order in self.color_clued_card_orders:
-                    output += "|"
+                    cluedness_row += "|"
                 else:
-                    output += " "
+                    cluedness_row += " "
 
                 for _id, orders in self.other_info_clued_card_orders.items():
-                    output += _id[0].upper() if card.order in orders else " "
-                output += " " * (
+                    cluedness_row += _id[0].upper() if card.order in orders else " "
+                cluedness_row += " " * (
                     len(SUITS[self.variant_name])
                     + 1
                     - len(self.other_info_clued_card_orders)
                 )
-            output += "\n"
-
-        output += "Discards:\n"
-        for rank in range(1, 6):
-            output += "  "
-            for suit_index, suit in enumerate(SUITS[self.variant_name]):
-                num_discards = self.discards.get((suit_index, rank), 0)
-                output += str(num_discards) if num_discards > 0 else "."
-            output += "\n"
-
+            card_rows[second_segment] += "{x:{width}}".format(x=cluedness_row, width=width_per_hand)
+        output += "\n".join([x for x in card_rows if x != ""])
+        output += "\n"
         print(output)
 
     def remove_card_from_hand(self, player_index, order):

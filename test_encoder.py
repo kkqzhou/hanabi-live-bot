@@ -1,7 +1,7 @@
 from conventions.encoder import BaseEncoderGameState, EncoderV1GameState
 from game_state import RANK_CLUE, COLOR_CLUE, get_all_touched_cards, SUITS, Card
 from test_functions import check_eq
-from test_game_state import create_game_states, get_deck_from_tuples
+from test_game_state import create_game_states, get_deck_from_tuples, give_clue, play, discard, play_draw, discard_draw
 import datetime as dt
 from typing import Dict, List, Type
 
@@ -18,85 +18,6 @@ def give_hat_clue(states: Dict[int, BaseEncoderGameState], giver: int):
         _state.handle_clue(giver, target_index, clue_type, clue_value, touched_orders)
         _state.turn += 1
     return clue_value, clue_type, target_index
-
-
-def give_clue(
-    states: Dict[int, BaseEncoderGameState],
-    giver: int,
-    clue_type: int,
-    clue_value: int,
-    target_index: int,
-):
-    state = states[giver]
-    touched_cards = get_all_touched_cards(clue_type, clue_value, state.variant_name)
-    touched_orders = [
-        x.order for x in state.hands[target_index] if x.to_tuple() in touched_cards
-    ]
-    for _state in states.values():
-        _state.handle_clue(giver, target_index, clue_type, clue_value, touched_orders)
-        _state.turn += 1
-
-
-def discard(states: Dict[int, BaseEncoderGameState], order: int):
-    player_index, i = states[0].order_to_index[order]
-    another_player = 0 if player_index != 0 else 1
-    card_visible = states[another_player].hands[player_index][i]
-    assert card_visible.order == order
-    for _state in states.values():
-        _state.handle_discard(
-            player_index, order, card_visible.suit_index, card_visible.rank
-        )
-        _state.turn += 1
-    return player_index
-
-
-def play(states: Dict[int, BaseEncoderGameState], order: int):
-    player_index, i = states[0].order_to_index[order]
-    another_player = 0 if player_index != 0 else 1
-    card_visible = states[another_player].hands[player_index][i]
-    assert card_visible.order == order
-    for _state in states.values():
-        _state.handle_play(
-            player_index, order, card_visible.suit_index, card_visible.rank
-        )
-        _state.turn += 1
-    return player_index
-
-
-def draw(
-    states: Dict[int, BaseEncoderGameState],
-    order: int,
-    player_index: int,
-    suit_index: int,
-    rank: int,
-):
-    for p_index, state in states.items():
-        if p_index == player_index:
-            state.handle_draw(player_index, order, -1, -1)
-        else:
-            state.handle_draw(player_index, order, suit_index, rank)
-
-
-def play_draw(
-    states: Dict[int, BaseEncoderGameState],
-    order: int,
-    draw_order: int,
-    draw_suit_index: int,
-    draw_rank: int,
-):
-    player_index = play(states, order)
-    draw(states, draw_order, player_index, draw_suit_index, draw_rank)
-
-
-def discard_draw(
-    states: Dict[int, BaseEncoderGameState],
-    order: int,
-    draw_order: int,
-    draw_suit_index: int,
-    draw_rank: int,
-):
-    player_index = discard(states, order)
-    draw(states, draw_order, player_index, draw_suit_index, draw_rank)
 
 
 def construct_test_state(

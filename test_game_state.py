@@ -1,9 +1,11 @@
 import game_state
-from game_state import COLOR_CLUE, RANK_CLUE, Card, GameState, get_all_cards, get_random_deck
+from game_state import COLOR_CLUE, RANK_CLUE, Card, GameState, get_all_cards, get_random_deck, get_all_touched_cards
 from test_functions import all_rank, all_suit, check_eq
 import numpy as np
 import datetime as dt
-from typing import List, Tuple
+from typing import Dict, Optional, List, Tuple, Union
+import requests
+import json
 
 
 def get_deck_from_tuples(tups: List[Tuple[int, int]]):
@@ -11,14 +13,19 @@ def get_deck_from_tuples(tups: List[Tuple[int, int]]):
 
 
 def create_game_states(
-    num_players: int,
+    players: Union[int, List[str]],
     variant_name: str,
     game_state_cls=GameState,
     seed: int = 20000,
-    deck=None,
+    deck: Optional[List[Card]] = None,
+    stacks: Optional[List[int]] = None,
 ):
     np.random.seed(seed)
-    player_names = [f"test{x}" for x in range(num_players)]
+    if isinstance(players, int):
+        player_names = [f"test{x}" for x in range(players)]
+    else:
+        player_names = players
+    
     states = {
         player_index: game_state_cls(variant_name, player_names, player_index)
         for player_index, _ in enumerate(player_names)
@@ -37,7 +44,143 @@ def create_game_states(
                     states[player_iterate].handle_draw(
                         player_index, order, card.suit_index, card.rank
                     )
+                if stacks is not None:
+                    states[player_iterate].stacks = stacks
             order += 1
+
+    return states
+
+
+def give_clue(
+    states: Dict[int, game_state.GameState],
+    giver: int,
+    clue_type: int,
+    clue_value: int,
+    target_index: int,
+):
+    state = states[giver]
+    touched_cards = get_all_touched_cards(clue_type, clue_value, state.variant_name)
+    touched_orders = [
+        x.order for x in state.hands[target_index] if x.to_tuple() in touched_cards
+    ]
+    for _state in states.values():
+        _state.handle_clue(giver, target_index, clue_type, clue_value, touched_orders)
+        _state.turn += 1
+        _state.clue_tokens -= 1
+
+
+def draw(
+    states: Dict[int, game_state.GameState],
+    order: int,
+    player_index: int,
+    suit_index: int,
+    rank: int,
+):
+    for p_index, state in states.items():
+        if p_index == player_index:
+            state.handle_draw(player_index, order, -1, -1)
+        else:
+            state.handle_draw(player_index, order, suit_index, rank)
+
+
+def discard(states: Dict[int, game_state.GameState], order: int):
+    player_index, i = states[0].order_to_index[order]
+    another_player = 0 if player_index != 0 else 1
+    card_visible = states[another_player].hands[player_index][i]
+    assert card_visible.order == order
+    for _state in states.values():
+        _state.handle_discard(
+            player_index, order, card_visible.suit_index, card_visible.rank
+        )
+        _state.turn += 1
+        _state.clue_tokens += 1
+    return player_index
+
+
+def play(states: Dict[int, game_state.GameState], order: int):
+    player_index, i = states[0].order_to_index[order]
+    another_player = 0 if player_index != 0 else 1
+    dummy_state = states[another_player]
+    dummy_state_playables = dummy_state.playables
+    card_visible = dummy_state.hands[player_index][i]
+    assert card_visible.order == order
+    for _state in states.values():
+        if (card_visible.suit_index, card_visible.rank) in dummy_state_playables:
+            _state.handle_play(
+                player_index, order, card_visible.suit_index, card_visible.rank
+            )
+        else:
+            _state.handle_discard(
+                player_index, order, card_visible.suit_index, card_visible.rank
+            )
+            _state.bombs += 1
+        _state.turn += 1
+    return player_index
+
+
+def play_draw(
+    states: Dict[int, game_state.GameState],
+    order: int,
+    draw_order: int,
+    draw_suit_index: int,
+    draw_rank: int,
+):
+    player_index = play(states, order)
+    draw(states, draw_order, player_index, draw_suit_index, draw_rank)
+
+
+def discard_draw(
+    states: Dict[int, game_state.GameState],
+    order: int,
+    draw_order: int,
+    draw_suit_index: int,
+    draw_rank: int,
+):
+    player_index = discard(states, order)
+    draw(states, draw_order, player_index, draw_suit_index, draw_rank)
+
+
+def get_game_state_from_replay(id_, turn, game_state_cls: GameState):
+    var_id_to_name = {x["id"]: x["name"] for x in json.load(open("variants.json", "r"))}
+    blob = requests.get(f"https://hanab.live/export/{id_}").json()
+    variant_name = var_id_to_name[int(blob["seed"].split("v")[-1].split("s")[0])]
+    deck = get_deck_from_tuples([(x["suitIndex"], x["rank"]) for x in blob["deck"]])
+    states = create_game_states(
+        blob["players"],
+        variant_name,
+        game_state_cls=game_state_cls,
+        deck=deck
+    )
+    next_card_order = len(states) * len(states[0].hands[0])
+    for i in range(turn-1):
+        # type 0 = play, target = order
+        # type 1 = discard, target = order
+        # type 2 = clue color, target = player index, value = clue value
+        # type 3 = clue rank, target = player index, value = clue value
+        draw_rank, draw_suit_index = None, None
+        giver = i % len(states)
+        x = blob["actions"][i]
+
+        if x["type"] == 0:
+            if len(deck):
+                draw_suit_index, draw_rank = deck.pop(0).to_tuple()
+                play_draw(states, x["target"], next_card_order, draw_suit_index, draw_rank)
+                next_card_order += 1
+            else:
+                play(states, x["target"])
+        elif x["type"] == 1:
+            if len(deck):
+                draw_suit_index, draw_rank = deck.pop(0).to_tuple()
+                discard_draw(states, x["target"], next_card_order, draw_suit_index, draw_rank)
+                next_card_order += 1
+            else:
+                discard(states, x["target"])
+        elif x["type"] == 2:
+            give_clue(states, giver, COLOR_CLUE, x["value"], x["target"])
+        elif x["type"] == 3:
+            give_clue(states, giver, RANK_CLUE, x["value"], x["target"])
+        else:
+            raise NotImplementedError(x["type"])
 
     return states
 
@@ -252,5 +395,4 @@ def test_all():
 
 
 if __name__ == "__main__":
-    # test_all()
-    test_reversed()
+    test_all()
