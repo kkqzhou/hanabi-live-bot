@@ -40,13 +40,15 @@ def get_reactive_trash_human_slot(
 ) -> Optional[int]:
     """Human slot means newest = 1, instead of oldest = 0"""
     leftmost_trash = None
+    already_clued_cards_in_hand = set()
     for i, card in enumerate(target_hand):
         # first iterate over clued cards
         if card.order not in clued_orders:
             continue
         
+        already_clued_cards_in_hand.add(card.to_tuple())
         candidates = candidates_list[i]
-        # TODO: this is a bug that will need to be fixed eventually, but need to use filtration instead of candidates
+        # keep in mind that filtrations should be passed in instead of candidates themselves
         if not len(candidates.difference(trash)) and len(candidates):
             continue
         
@@ -56,18 +58,22 @@ def get_reactive_trash_human_slot(
     if leftmost_trash is not None:
         return leftmost_trash
 
+    already_seen = set()
     for i, card in enumerate(target_hand):
         # then iterate over unclued cards
         if card.order in clued_orders or card.order in discard_orders:
             continue
         
         candidates = candidates_list[i]
-        # TODO: this is a bug that will need to be fixed eventually, but need to use filtration instead of candidates
         if not len(candidates.difference(trash)) and len(candidates):
+            # globally known trash is skipped over
             continue
 
-        if card.to_tuple() in trash:
+        if card.to_tuple() in trash or card.to_tuple() in already_clued_cards_in_hand or card.to_tuple() in already_seen:
             leftmost_trash = len(target_hand) - i
+
+        # use this to keep track of same hand dupes
+        already_seen.add(card.to_tuple())
 
     return leftmost_trash
 
@@ -83,7 +89,7 @@ class UnresolvedReaction:
         current_play_orders: List[int],
         current_clued_orders: Set[int],
         current_discard_orders: Set[int],
-        all_candidates_list: Dict[int, List[Set[Tuple[int, int]]]],
+        all_base_filtrations: Dict[int, List[Set[Tuple[int, int]]]],
         target_hand: List[Card],
         playables: List[Tuple[int, int]],
         trash: List[Tuple[int, int]]
@@ -97,7 +103,7 @@ class UnresolvedReaction:
         self.current_play_orders = current_play_orders
         self.current_clued_orders = current_clued_orders
         self.current_discard_orders = current_discard_orders
-        self.all_candidates_list = all_candidates_list
+        self.all_base_filtrations = all_base_filtrations
         self.target_hand = target_hand
         self.playables = playables
         self.trash = trash
@@ -115,10 +121,10 @@ class UnresolvedReaction:
         return (card.suit_index, card.rank) in self.playables
     
     def get_reactive_playable_human_slot(self):
-        return get_reactive_playable_human_slot(self.target_hand, self.all_candidates_list[self.target_index], self.playables, self.current_play_orders)
+        return get_reactive_playable_human_slot(self.target_hand, self.all_base_filtrations[self.target_index], self.playables, self.current_play_orders)
 
     def get_reactive_trash_human_slot(self):
-        return get_reactive_trash_human_slot(self.target_hand, self.all_candidates_list[self.target_index], self.trash, self.current_clued_orders, self.current_discard_orders)
+        return get_reactive_trash_human_slot(self.target_hand, self.all_base_filtrations[self.target_index], self.trash, self.current_clued_orders, self.current_discard_orders)
 
 
 class ReactorGameState(GameState):
@@ -140,6 +146,7 @@ class ReactorGameState(GameState):
             i: None
             for i in range(self.num_players)
         }
+        self.locked = {i: False for i in range(self.num_players)}
 
     @property
     def next_player_index(self) -> int:
@@ -195,21 +202,24 @@ class ReactorGameState(GameState):
     def has_safe_discard(self, player_index: int) -> bool:
         return len(self.discard_orders[player_index]) > 0
     
+    def is_locked(self, player_index: int) -> bool:
+        return self.locked[player_index] or (self.pace < self.num_players) or ((self.clue_tokens == 8) and (self.turn > 0))
+    
     def get_reactive_player_index_ordering(self, player_index: Optional[int] = None) -> List[int]:
         """This can be empty if everyone has safe plays."""
-        ben = None
+        first_reacter = None
         pindex = player_index if player_index is not None else self.our_player_index
         for i in range(self.num_players - 1):
             player_index = (pindex + 1 + i) % self.num_players
             if not self.has_safe_play(player_index):
-                ben = player_index
+                first_reacter = player_index
                 break
 
-        if ben is None:
+        if first_reacter is None or self.is_locked(pindex):
             return []
         
-        ordering = [ben]
-        _player_index = ben
+        ordering = [first_reacter]
+        _player_index = first_reacter
         for i in range(self.num_players - 1):
             _player_index = (_player_index + 1) % self.num_players
             if _player_index != pindex:
@@ -247,15 +257,17 @@ class ReactorGameState(GameState):
     def update_play_discard_orders(self):
         for player_index in range(self.num_players):
             candidates_list = self.all_candidates_list[player_index]
+            filtrations = self.all_base_filtrations[player_index]
             for i, candidates in enumerate(candidates_list):
                 card = self.hands[player_index][i]
-                if self.is_playable(candidates) and card.order not in self.play_orders[player_index]:
-                    print(f'[update_play_discard_orders 1] Adding play order {card.order}')
+                filtration = filtrations[i]
+                if self.is_playable(filtration) and card.order not in self.play_orders[player_index]:
+                    print(f'[update_play_discard_orders 1] pindex {player_index} Adding play order {card.order}')
                     self.play_orders[player_index].append(card.order)
 
                 if self.is_trash(candidates):
                     if card.order not in self.discard_orders[player_index]:
-                        print(f'[update_play_discard_orders 2] Adding discard order {card.order}')
+                        print(f'[update_play_discard_orders 2] pindex {player_index} Adding discard order {card.order}')
                         self.discard_orders[player_index].append(card.order)
                     self.play_orders[player_index] = [
                         x for x in self.play_orders[player_index] if x != card.order
@@ -391,7 +403,7 @@ class ReactorGameState(GameState):
             current_play_orders=deepcopy(self.all_play_orders),
             current_clued_orders=deepcopy(self.clued_card_orders),
             current_discard_orders=deepcopy(self.all_discard_orders),
-            all_candidates_list=deepcopy(self.all_candidates_list),
+            all_base_filtrations=deepcopy(self.all_base_filtrations),
             target_hand=deepcopy(target_hand),
             playables=deepcopy(self.playables),
             trash=deepcopy(self.trash)
@@ -624,7 +636,11 @@ class ReactorGameState(GameState):
         ]
         return max(shifted_indices)
 
-    def get_stable_clues(self) -> Dict[Tuple[int, int, int], str]:
+    def get_stable_clues(
+        self,
+        clue_types: Optional[List[int]] = None,
+        clue_values: Optional[List[int]] = None
+    ) -> Dict[Tuple[int, int, int], List]:
         """(clue_value, clue_type, target_index) -> clue_type"""
         result = {}
         ordering = self.get_reactive_player_index_ordering()
@@ -634,12 +650,15 @@ class ReactorGameState(GameState):
                 continue
             
             target_hand = self.hands[target_index]
-            for clue_type in [RANK_CLUE, COLOR_CLUE]:
-                if clue_type == RANK_CLUE:
-                    all_clue_values = get_available_rank_clues(self.variant_name)
+            for clue_type in (clue_types or [RANK_CLUE, COLOR_CLUE]):
+                if clue_values is None:
+                    if clue_type == RANK_CLUE:
+                        all_clue_values = get_available_rank_clues(self.variant_name)
+                    else:
+                        color_clues = get_available_color_clues(self.variant_name)
+                        all_clue_values = list(range(len(color_clues)))
                 else:
-                    color_clues = get_available_color_clues(self.variant_name)
-                    all_clue_values = list(range(len(color_clues)))
+                    all_clue_values = clue_values[:]
 
                 for clue_value in all_clue_values:
                     touched_card_tuples = self.get_touched_card_tuples(clue_type, clue_value)
@@ -655,16 +674,12 @@ class ReactorGameState(GameState):
                     for c in target_hand:
                         if c.order in self.all_play_orders:
                             continue
-                        
                         if c.order in self.all_discard_orders:
                             continue
-
                         if c.order not in self.clued_card_orders:
                             continue
-
                         if c.order not in touched_card_orders:
                             continue
-
                         candidates = self.get_candidates(c.order)
                         new_cands = candidates.intersection(touched_card_tuples)
                         
@@ -672,31 +687,32 @@ class ReactorGameState(GameState):
                             reveals_safe_action = True
 
                     if reveals_safe_action:
-                        result[(clue_value, clue_type, target_index)] = "SAFE_ACTION"
+                        result[(clue_value, clue_type, target_index)] = ["SAFE_ACTION"]
                     elif len(newly_touched_cards):
                         if clue_type == RANK_CLUE:
                             all_good_playable = self.every_good_card_of_rank_is_playable(clue_value)
                             all_rank_trash = self.every_card_of_rank_is_trash(clue_value)
 
                             if all_good_playable:
-                                if not self.is_weak_trash_card(newly_touched_cards[-1]):
-                                    result[(clue_value, clue_type, target_index)] = "DIRECT_PLAY"
+                                if not self.is_trash_card(newly_touched_cards[-1]):
+                                    result[(clue_value, clue_type, target_index)] = ["DIRECT_PLAY", newly_touched_cards[-1].to_tuple()]
                             elif all_rank_trash:
                                 ref_play_index = self.get_index_of_ref_play_target(target_index, clue_type, clue_value)
                                 targeted_card = target_hand[ref_play_index]
                                 if self.is_playable_card(targeted_card) and targeted_card.to_tuple() not in self.all_play_tuples:
-                                    result[(clue_value, clue_type, target_index)] = "REF_PLAY"
+                                    result[(clue_value, clue_type, target_index)] = ["REF_PLAY", targeted_card.to_tuple()]
                             elif not all_good_playable:
                                 ref_discard_index = self.get_index_of_ref_discard_target(target_index, clue_type, clue_value)
                                 if ref_discard_index is None:
-                                    result[(clue_value, clue_type, target_index)] = "LOCK"
+                                    result[(clue_value, clue_type, target_index)] = ["LOCK"]
                                 else:
-                                    result[(clue_value, clue_type, target_index)] = "REF_DISCARD"
+                                    targeted_card = target_hand[ref_discard_index]
+                                    result[(clue_value, clue_type, target_index)] = ["REF_DISCARD", targeted_card.to_tuple()]
                         else:
                             ref_play_index = self.get_index_of_ref_play_target(target_index, clue_type, clue_value)
-                            playable_card = target_hand[ref_play_index]
-                            if self.is_playable_card(playable_card) and playable_card.to_tuple() not in self.all_play_tuples:
-                                result[(clue_value, clue_type, target_index)] = "REF_PLAY"
+                            targeted_card = target_hand[ref_play_index]
+                            if self.is_playable_card(targeted_card) and targeted_card.to_tuple() not in self.all_play_tuples:
+                                result[(clue_value, clue_type, target_index)] = ["REF_PLAY", targeted_card.to_tuple()]
 
         return result
 
@@ -735,7 +751,7 @@ class ReactorGameState(GameState):
                     )
                     pslot = get_reactive_playable_human_slot(
                         target_hand,
-                        self.all_candidates_list[target_index],
+                        self.all_base_filtrations[target_index],
                         self.playables,
                         self.all_play_orders
                     )
@@ -750,35 +766,36 @@ class ReactorGameState(GameState):
 
                                     reacter_tuple_required = self.get_next_playable_card_tuple(target_card.suit_index)
                                     if reacter_tuple_required not in self.all_candidates_list[reacter_index][-fslot]:
-                                        print(
-                                            f'[{clue_value}, {clue_type}, {target_index}] Attempted finessed card '
-                                            f'{reacter_tuple_required} cannot be on reacters slot {fslot}'
-                                        )
+                                        # if by empathy the connecting card can't be there, continue
                                         continue
                                     
                                     if reacter_card.to_tuple() == reacter_tuple_required:
-                                        result[(clue_value, clue_type, target_index)] = '2P0D_FINESSE'
+                                        result[(clue_value, clue_type, target_index)] = ['2P0D_FINESSE', reacter_card.to_tuple(), target_card.to_tuple()]
 
                                     break
                         else:
                             reactive_pslot = (focused_slot - pslot - 1) % len(target_hand) + 1
-                            if self.is_playable_card(reacter_hand[-reactive_pslot]) and reacter_hand[-reactive_pslot].to_tuple() != target_hand[-pslot].to_tuple():
-                                result[(clue_value, clue_type, target_index)] = '2P0D_PLAY'
+                            first_card = reacter_hand[-reactive_pslot]
+                            second_card = target_hand[-pslot]
+                            if self.is_playable_card(first_card) and first_card.to_tuple() != second_card.to_tuple():
+                                result[(clue_value, clue_type, target_index)] = ['2P0D_PLAY', first_card.to_tuple(), second_card.to_tuple()]
                     else:                      
                         tslot = get_reactive_trash_human_slot(
                             target_hand,
-                            self.all_candidates_list[target_index],
+                            self.all_base_filtrations[target_index],
                             self.trash,
                             self.clued_card_orders,
                             self.all_discard_orders
                         )
                         if pslot is not None:
                             reactive_tslot = (focused_slot - pslot - 1) % len(target_hand) + 1
-                            if not self.is_critical_card(reacter_hand[-reactive_tslot]):
-                                result[(clue_value, clue_type, target_index)] = '1P1D_DISCARD'
+                            discard = reacter_hand[-reactive_tslot]
+                            if not self.is_critical_card(discard):
+                                result[(clue_value, clue_type, target_index)] = ['1P1D_DISCARD', discard.to_tuple(), target_hand[-pslot].to_tuple()]
                         elif tslot is not None:
                             reactive_pslot = (focused_slot - tslot - 1) % len(target_hand) + 1
-                            if self.is_playable_card(reacter_hand[-reactive_pslot]):
-                                result[(clue_value, clue_type, target_index)] = '1P1D_PLAY'
+                            playable = reacter_hand[-reactive_pslot]
+                            if self.is_playable_card(playable):
+                                result[(clue_value, clue_type, target_index)] = ['1P1D_PLAY', playable.to_tuple(), target_hand[-tslot].to_tuple()]
 
         return result

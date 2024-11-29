@@ -1,9 +1,13 @@
+from card import Card
 from conventions.encoder import BaseEncoderGameState, EncoderV1GameState
-from game_state import RANK_CLUE, COLOR_CLUE, get_all_touched_cards, SUITS, Card
-from test_functions import check_eq
-from test_game_state import create_game_states, get_deck_from_tuples, give_clue, play, discard, play_draw, discard_draw
+from constants import RANK_CLUE, COLOR_CLUE
+from tes_helpers import check_eq, create_game_states, get_deck_from_tuples, give_clue, play, discard, play_draw, discard_draw
+from variants import SUITS, get_all_touched_cards
+
 import datetime as dt
 from typing import Dict, List, Type
+
+# WIP as of 2024/11/27 refactoring overhaul
 
 
 def give_hat_clue(states: Dict[int, BaseEncoderGameState], giver: int):

@@ -1,148 +1,6 @@
-import game_state
-import datetime as dt
-
-
-def all_suit(suit_index):
-    return {(suit_index, i) for i in range(1, 6)}
-
-
-def all_rank(rank, suit_indices):
-    return {(suit_index, rank) for suit_index in suit_indices}
-
-
-def check_eq(actual, expected):
-    assert actual == expected, f"\nExpected: {expected}\nActual: {actual}"
-
-
-def run_simple_test(fn, tests):
-    for input, exp in tests.items():
-        act = fn(input) if not isinstance(input, tuple) else fn(*input)
-        fn_name = fn.__name__
-        assert act == exp, f"{fn_name}\nInput: {input}\nExpected: {exp}\nActual: {act}"
-    print(f"{len(tests)} tests for {fn_name} passed!")
-
-
-def test_get_starting_pace():
-    tests = {
-        (2, "No Variant"): 17,
-        (3, "Rainbow (5 Suits)"): 13,
-        (4, "Dual-Color (5 Suits)"): 13,
-        (5, "Extremely Ambiguous (5 Suits)"): 10,
-        (6, "White Reversed (5 Suits)"): 13,
-        (2, "6 Suits"): 22,
-        (3, "Ambiguous & Dual-Color"): 18,
-        (4, "RGB Mix (6 Suits)"): 18,
-        (5, "Alternating Clues (6 Suits)"): 15,
-        (6, "Holiday Mix (6 Suits)"): 18,
-        (2, "Black (6 Suits)"): 17,
-        (3, "Candy Corn Mix (6 Suits)"): 13,
-        (4, "Special Mix (6 Suits)"): 13,
-        (5, "Null-Ones & Dark Null (6 Suits)"): 10,
-        (6, "Valentine Mix (6 Suits)"): 13,
-        (2, "Gray (5 Suits)"): 12,
-        (3, "Holiday Mix (5 Suits)"): 8,
-        (4, "Special Mix (5 Suits)"): 8,
-        (5, "Dark Rainbow Reversed (5 Suits)"): 5,
-        (6, "Ambiguous & Dark Brown (5 Suits)"): 8,
-        (2, "Pink (4 Suits)"): 12,
-        (3, "Dual-Color & White (4 Suits)"): 8,
-        (4, "Matryoshka (4 Suits)"): 8,
-        (5, "Synesthesia (4 Suits)"): 5,
-        (6, "Duck (4 Suits)"): 8,
-        (2, "3 Suits"): 7,
-        (3, "Funnels (3 Suits)"): 3,
-        (4, "Chimneys (3 Suits)"): 3,
-        (5, "Color Mute (3 Suits)"): 0,
-        (6, "Number Mute (3 Suits)"): 3,
-        (2, "Critical Fours (5 Suits)"): 12,
-        (3, "Critical Fours (5 Suits)"): 8,
-        (4, "Critical Fours (5 Suits)"): 8,
-        (5, "Critical Fours (5 Suits)"): 5,
-        (6, "Critical Fours (5 Suits)"): 8,
-        (2, "Critical Fours (6 Suits)"): 16,
-        (3, "Critical Fours (6 Suits)"): 12,
-        (4, "Critical Fours (6 Suits)"): 12,
-        (5, "Critical Fours (6 Suits)"): 9,
-        (6, "Critical Fours (6 Suits)"): 12,
-        (2, "Black & Dark Rainbow (6 Suits)"): 12,
-        (3, "Gray & Gray Pink (6 Suits)"): 8,
-        (4, "Dark Omni & Dark Null (6 Suits)"): 8,
-        (5, "Dark Pink & Cocoa Rainbow (6 Suits)"): 5,
-        (6, "Dark Brown & Dark Prism (6 Suits)"): 8,
-        (2, "Clue Starved (5 Suits)"): 17,
-        (3, "Clue Starved & Rainbow (5 Suits)"): 13,
-        (4, "Clue Starved & Brown (5 Suits)"): 13,
-        (5, "Clue Starved & White (5 Suits)"): 10,
-        (6, "Clue Starved & Null (5 Suits)"): 13,
-        (2, "Clue Starved (6 Suits)"): 22,
-        (3, "Clue Starved & Rainbow (6 Suits)"): 18,
-        (4, "Clue Starved & Brown (6 Suits)"): 18,
-        (5, "Clue Starved & White (6 Suits)"): 15,
-        (6, "Clue Starved & Null (6 Suits)"): 18,
-    }
-    run_simple_test(game_state.get_starting_pace, tests)
-
-
-def test_get_starting_efficiency():
-    tests = {
-        (2, "No Variant"): 25 / 29,
-        (3, "Rainbow (5 Suits)"): 1.0,
-        (4, "Dual-Color (5 Suits)"): 1.0,
-        (5, "Extremely Ambiguous (5 Suits)"): 25 / 21,
-        (6, "White Reversed (5 Suits)"): 25 / 24,
-        (2, "6 Suits"): 30 / 35,
-        (3, "Ambiguous & Dual-Color"): 30 / 31,
-        (4, "RGB Mix (6 Suits)"): 30 / 31,
-        (5, "Alternating Clues (6 Suits)"): 10 / 9,
-        (6, "Holiday Mix (6 Suits)"): 1.0,
-        (2, "Black (6 Suits)"): 1.0,
-        (3, "Candy Corn Mix (6 Suits)"): 15 / 13,
-        (4, "Special Mix (6 Suits)"): 15 / 13,
-        (5, "Null-Ones & Dark Null (6 Suits)"): 15 / 11,
-        (6, "Valentine Mix (6 Suits)"): 1.2,
-        (2, "Gray (5 Suits)"): 25 / 24,
-        (3, "Holiday Mix (5 Suits)"): 1.25,
-        (4, "Special Mix (5 Suits)"): 1.25,
-        (5, "Dark Rainbow Reversed (5 Suits)"): 1.5625,
-        (6, "Ambiguous & Dark Brown (5 Suits)"): 25 / 19,
-        (2, "Pink (4 Suits)"): 20 / 23,
-        (3, "Dual-Color & White (4 Suits)"): 20 / 19,
-        (4, "Matryoshka (4 Suits)"): 20 / 19,
-        (5, "Synesthesia (4 Suits)"): 4 / 3,
-        (6, "Duck (4 Suits)"): 10 / 9,
-        (2, "3 Suits"): 15 / 17,
-        (3, "Funnels (3 Suits)"): 15 / 13,
-        (4, "Chimneys (3 Suits)"): 15 / 13,
-        (5, "Color Mute (3 Suits)"): 5 / 3,
-        (6, "Number Mute (3 Suits)"): 1.25,
-        (2, "Critical Fours (5 Suits)"): 25 / 24,
-        (3, "Critical Fours (5 Suits)"): 1.25,
-        (4, "Critical Fours (5 Suits)"): 1.25,
-        (5, "Critical Fours (5 Suits)"): 1.5625,
-        (6, "Critical Fours (5 Suits)"): 25 / 19,
-        (2, "Critical Fours (6 Suits)"): 30 / 29,
-        (3, "Critical Fours (6 Suits)"): 1.2,
-        (4, "Critical Fours (6 Suits)"): 1.2,
-        (5, "Critical Fours (6 Suits)"): 10 / 7,
-        (6, "Critical Fours (6 Suits)"): 1.25,
-        (2, "Black & Dark Rainbow (6 Suits)"): 1.2,
-        (3, "Gray & Gray Pink (6 Suits)"): 10 / 7,
-        (4, "Dark Omni & Dark Null (6 Suits)"): 10 / 7,
-        (5, "Dark Pink & Cocoa Rainbow (6 Suits)"): 30 / 17,
-        (6, "Dark Brown & Dark Prism (6 Suits)"): 1.5,
-        (2, "Clue Starved (5 Suits)"): 25 / 18,
-        (3, "Clue Starved & Rainbow (5 Suits)"): 1.5625,
-        (4, "Clue Starved & Brown (5 Suits)"): 1.5625,
-        (5, "Clue Starved & White (5 Suits)"): 25 / 14,
-        (6, "Clue Starved & Null (5 Suits)"): 1.5625,
-        (2, "Clue Starved (6 Suits)"): 10 / 7,
-        (3, "Clue Starved & Rainbow (6 Suits)"): 30 / 19,
-        (4, "Clue Starved & Brown (6 Suits)"): 30 / 19,
-        (5, "Clue Starved & White (6 Suits)"): 30 / 17,
-        (6, "Clue Starved & Null (6 Suits)"): 30 / 19,
-    }
-    run_simple_test(game_state.get_starting_efficiency, tests)
-
+from tes_helpers import run_simple_test, all_suit, all_rank
+import variants
+from constants import COLOR_CLUE, RANK_CLUE
 
 def test_get_available_rank_clues():
     tests = {
@@ -187,7 +45,7 @@ def test_get_available_rank_clues():
         "Special Mix (5 Suits)": [1, 2, 3, 4, 5],
         "Special Mix (6 Suits)": [1, 2, 3, 4, 5],
     }
-    run_simple_test(game_state.get_available_rank_clues, tests)
+    run_simple_test(variants.get_available_rank_clues, tests)
 
 
 def test_get_available_color_clues():
@@ -247,12 +105,12 @@ def test_get_available_color_clues():
         ],
         "RGB Mix (6 Suits)": ["Red", "Green", "Blue"],
     }
-    run_simple_test(game_state.get_available_color_clues, tests)
+    run_simple_test(variants.get_available_color_clues, tests)
 
 
 def test_get_all_touched_cards():
     # fmt: off
-    C, R = game_state.COLOR_CLUE, game_state.RANK_CLUE
+    C, R = COLOR_CLUE, RANK_CLUE
     tests = {
         (C, 1, "No Variant"): all_suit(1),
         (C, 5, "Black (6 Suits)"): all_suit(5),
@@ -419,11 +277,11 @@ def test_get_all_touched_cards():
         (R, 4, "Chimneys (5 Suits)"): {x for i in {4, 5} for x in all_rank(i, range(5))},
         (R, 5, "Chimneys (5 Suits)"): {x for i in {5} for x in all_rank(i, range(5))},
     }
-    run_simple_test(game_state.get_all_touched_cards, tests)
+    run_simple_test(variants.get_all_touched_cards, tests)
     # fmt: on
 
 
-def test_is_brownish_pinkish():
+def test_is_brownish():
     tests = {
         "No Variant": False,
         "Black (5 Suits)": False,
@@ -437,14 +295,14 @@ def test_is_brownish_pinkish():
         "Brown (6 Suits)": True,
         "Dark Brown (6 Suits)": True,
         "Gray & Dark Brown (6 Suits)": True,
-        "Pink (6 Suits)": True,
-        "Dark Pink (6 Suits)": True,
-        "Light Pink (6 Suits)": True,
-        "Gray Pink (6 Suits)": True,
+        "Pink (6 Suits)": False,
+        "Dark Pink (6 Suits)": False,
+        "Light Pink (6 Suits)": False,
+        "Gray Pink (6 Suits)": False,
         "Muddy Rainbow (6 Suits)": True,
         "Cocoa Rainbow (6 Suits)": True,
-        "Omni (6 Suits)": True,
-        "Dark Omni (6 Suits)": True,
+        "Omni (6 Suits)": False,
+        "Dark Omni (6 Suits)": False,
         "Null (6 Suits)": True,
         "Dark Null (6 Suits)": True,
         "Special Mix (5 Suits)": True,
@@ -453,9 +311,57 @@ def test_is_brownish_pinkish():
         "Valentine Mix (6 Suits)": True,
         "White-Ones (6 Suits)": False,
         "Rainbow-Ones (6 Suits)": False,
-        "Pink-Ones (6 Suits)": True,
+        "Pink-Ones (6 Suits)": False,
         "Brown-Ones (6 Suits)": True,
         "Null-Ones (6 Suits)": True,
+        "Deceptive-Ones (6 Suits)": False,
+        "Deceptive-Fives (6 Suits)": False,
+        "Funnels (6 Suits)": False,
+        "Funnels & Brown (6 Suits)": True,
+        "Chimneys (6 Suits)": False,
+        "Chimneys & Muddy Rainbow (6 Suits)": True,
+        "Ambiguous (6 Suits)": False,
+        "Very Ambiguous (6 Suits)": False,
+        "Extremely Ambiguous (6 Suits)": False,
+        "Holiday Mix (5 Suits)": False,
+        "Holiday Mix (6 Suits)": False,
+    }
+    run_simple_test(variants.is_brownish, tests)
+
+
+def test_is_pinkish():
+    tests = {
+        "No Variant": False,
+        "Black (5 Suits)": False,
+        "Prism (5 Suits)": False,
+        "Dark Prism (5 Suits)": False,
+        "Black & Dark Prism (6 Suits)": False,
+        "Rainbow (5 Suits)": False,
+        "Dark Rainbow (5 Suits)": False,
+        "White (5 Suits)": False,
+        "Gray (5 Suits)": False,
+        "Brown (6 Suits)": False,
+        "Dark Brown (6 Suits)": False,
+        "Gray & Dark Brown (6 Suits)": False,
+        "Pink (6 Suits)": True,
+        "Dark Pink (6 Suits)": True,
+        "Light Pink (6 Suits)": True,
+        "Gray Pink (6 Suits)": True,
+        "Muddy Rainbow (6 Suits)": False,
+        "Cocoa Rainbow (6 Suits)": False,
+        "Omni (6 Suits)": True,
+        "Dark Omni (6 Suits)": True,
+        "Null (6 Suits)": False,
+        "Dark Null (6 Suits)": False,
+        "Special Mix (5 Suits)": True,
+        "Special Mix (6 Suits)": True,
+        "Valentine Mix (5 Suits)": True,
+        "Valentine Mix (6 Suits)": True,
+        "White-Ones (6 Suits)": False,
+        "Rainbow-Ones (6 Suits)": False,
+        "Pink-Ones (6 Suits)": True,
+        "Brown-Ones (6 Suits)": False,
+        "Null-Ones (6 Suits)": False,
         "Deceptive-Ones (6 Suits)": False,
         "Deceptive-Fives (6 Suits)": False,
         "Funnels (6 Suits)": True,
@@ -466,18 +372,18 @@ def test_is_brownish_pinkish():
         "Holiday Mix (5 Suits)": True,
         "Holiday Mix (6 Suits)": True,
     }
-    run_simple_test(game_state.is_brownish_pinkish, tests)
+    run_simple_test(variants.is_pinkish, tests)
 
 
-def test_is_whiteish_rainbowy():
+def test_is_whiteish():
     tests = {
         "No Variant": False,
         "Black (5 Suits)": False,
         "Prism (5 Suits)": False,
         "Dark Prism (5 Suits)": False,
         "Black & Dark Prism (6 Suits)": False,
-        "Rainbow (5 Suits)": True,
-        "Dark Rainbow (5 Suits)": True,
+        "Rainbow (5 Suits)": False,
+        "Dark Rainbow (5 Suits)": False,
         "White (5 Suits)": True,
         "Gray (5 Suits)": True,
         "Brown (6 Suits)": False,
@@ -487,10 +393,10 @@ def test_is_whiteish_rainbowy():
         "Dark Pink (6 Suits)": False,
         "Light Pink (6 Suits)": True,
         "Gray Pink (6 Suits)": True,
-        "Muddy Rainbow (6 Suits)": True,
-        "Cocoa Rainbow (6 Suits)": True,
-        "Omni (6 Suits)": True,
-        "Dark Omni (6 Suits)": True,
+        "Muddy Rainbow (6 Suits)": False,
+        "Cocoa Rainbow (6 Suits)": False,
+        "Omni (6 Suits)": False,
+        "Dark Omni (6 Suits)": False,
         "Null (6 Suits)": True,
         "Dark Null (6 Suits)": True,
         "Special Mix (5 Suits)": True,
@@ -498,35 +404,153 @@ def test_is_whiteish_rainbowy():
         "Valentine Mix (5 Suits)": True,
         "Valentine Mix (6 Suits)": True,
         "White-Ones (6 Suits)": True,
-        "Rainbow-Ones (6 Suits)": True,
+        "Rainbow-Ones (6 Suits)": False,
         "Pink-Ones (6 Suits)": False,
         "Brown-Ones (6 Suits)": False,
         "Null-Ones (6 Suits)": True,
         "Deceptive-Ones (6 Suits)": False,
         "Deceptive-Fives (6 Suits)": False,
         "Funnels (6 Suits)": False,
+        "Funnels & Gray (6 Suits)": True,
         "Chimneys (6 Suits)": False,
+        "Chimneys & White (6 Suits)": True,
         "Ambiguous (6 Suits)": False,
         "Very Ambiguous (6 Suits)": False,
         "Extremely Ambiguous (6 Suits)": False,
         "Holiday Mix (5 Suits)": True,
         "Holiday Mix (6 Suits)": True,
     }
-    run_simple_test(game_state.is_whiteish_rainbowy, tests)
+    run_simple_test(variants.is_whiteish, tests)
 
 
-def test_all():
-    t0 = dt.datetime.now()
-    test_get_starting_pace()
-    test_get_starting_efficiency()
+def test_is_rainbowy():
+    tests = {
+        "No Variant": False,
+        "Black (5 Suits)": False,
+        "Prism (5 Suits)": False,
+        "Dark Prism (5 Suits)": False,
+        "Black & Dark Prism (6 Suits)": False,
+        "Rainbow (5 Suits)": True,
+        "Dark Rainbow (5 Suits)": True,
+        "White (5 Suits)": False,
+        "Gray (5 Suits)": False,
+        "Brown (6 Suits)": False,
+        "Dark Brown (6 Suits)": False,
+        "Gray & Dark Brown (6 Suits)": False,
+        "Pink (6 Suits)": False,
+        "Dark Pink (6 Suits)": False,
+        "Light Pink (6 Suits)": False,
+        "Gray Pink (6 Suits)": False,
+        "Muddy Rainbow (6 Suits)": True,
+        "Cocoa Rainbow (6 Suits)": True,
+        "Omni (6 Suits)": True,
+        "Dark Omni (6 Suits)": True,
+        "Null (6 Suits)": False,
+        "Dark Null (6 Suits)": False,
+        "Special Mix (5 Suits)": True,
+        "Special Mix (6 Suits)": True,
+        "Valentine Mix (5 Suits)": True,
+        "Valentine Mix (6 Suits)": True,
+        "White-Ones (6 Suits)": False,
+        "Rainbow-Ones (6 Suits)": True,
+        "Pink-Ones (6 Suits)": False,
+        "Brown-Ones (6 Suits)": False,
+        "Null-Ones (6 Suits)": False,
+        "Deceptive-Ones (6 Suits)": False,
+        "Deceptive-Fives (6 Suits)": False,
+        "Funnels (6 Suits)": False,
+        "Funnels & Rainbow (6 Suits)": True,
+        "Chimneys (6 Suits)": False,
+        "Chimneys & Cocoa Rainbow (6 Suits)": True,
+        "Ambiguous (6 Suits)": False,
+        "Very Ambiguous (6 Suits)": False,
+        "Extremely Ambiguous (6 Suits)": False,
+        "Holiday Mix (5 Suits)": False,
+        "Holiday Mix (6 Suits)": False,
+    }
+    run_simple_test(variants.is_rainbowy, tests)
+
+
+def test_max_num_cards():
+    normal_counts = {
+        (suit_index, rank): (
+            3 if (rank == 1) else (2 if rank in {2, 3, 4} else 1)
+        )
+        for suit_index in range(5)
+        for rank in range(1, 6)
+    }
+    double_dark_counts = {
+        (suit_index, rank): (
+            3
+            if (suit_index < 4 and rank == 1)
+            else (2 if suit_index < 4 and rank in {2, 3, 4} else 1)
+        )
+        for suit_index in range(6)
+        for rank in range(1, 6)
+    }
+    crit_fours_counts = {
+        (suit_index, rank): (
+            3 if (rank == 1) else (2 if rank in {2, 3} else 1)
+        )
+        for suit_index in range(5)
+        for rank in range(1, 6)
+    }
+    reversed_counts = {
+        (suit_index, rank): (
+            3 if (rank == 5 and suit_index == 4 or rank == 1 and suit_index < 4)
+            else (2 if rank in {2, 3, 4} else 1)
+        )
+        for suit_index in range(5)
+        for rank in range(1, 6)
+    }
+    tests = {
+        "No Variant": normal_counts,
+        "Rainbow & Omni (5 Suits)": normal_counts,
+        "Black & Dark Rainbow (6 Suits)": double_dark_counts,
+        "Dark Pink & Dark Omni (6 Suits)": double_dark_counts,
+        "Gray & Cocoa Rainbow (6 Suits)": double_dark_counts,
+        "Dark Brown & Gray Pink (6 Suits)": double_dark_counts,
+        "Dark Null & Dark Prism (6 Suits)": double_dark_counts,
+        "Critical Fours (5 Suits)": crit_fours_counts,
+        "Critical Fours & Null (5 Suits)": crit_fours_counts,
+        "Rainbow Reversed (5 Suits)": reversed_counts,
+        "White Reversed (5 Suits)": reversed_counts,
+    }
+    run_simple_test(variants.get_card_counts, tests)
+
+
+def test_playables():
+    tests = {
+        ("No Variant", (0,0,1,2,3), 1): {(0, 1), (1,1), (2,2), (3,3), (4,4)},
+        ("Omni (6 Suits)", (0,0,1,2,3,4), 1): {(0, 1), (1,1), (2,2), (3,3), (4,4), (5,5)},
+        ("Reversed (6 Suits)", (5,1,2,3,4,1), 1): {(0, 6), (1,2), (2,3), (3,4), (4,5), (5,0)},
+        ("Reversed (6 Suits)", (4,0,1,2,3,4), 2): {(0, 6), (1,2), (2,3), (3,4), (4,5), (5,2)},
+    }
+    run_simple_test(variants.get_playables, tests)
+
+
+def test_trash():
+    tests = [
+        [("Black (6 Suits)", (1,0,0,3,0,0)), {(0, 1), (3, 1), (3, 2), (3, 3)}],
+        [("Black (6 Suits)", (1,0,0,0,0,3)), {(0, 1), (5, 1), (5, 2), (5, 3)}],
+        [("Black (6 Suits)", (1,0,0,1,0,0), {(2,3): 2}), {(0, 1), (3, 1), (2, 4), (2, 5)}],
+        [("Black (6 Suits)", (1,0,0,1,0,0), {(2,3): 2, (2,1): 3}), {(0, 1), (3, 1), (2,2), (2, 4), (2, 5)}],
+        [("Black (6 Suits)", (1,0,0,1,0,0), {(2,3): 2, (2,1): 3, (5,4): 1}), {(0, 1), (3, 1), (2,2), (2, 4), (2, 5), (5,5)}],
+        [("Black (6 Suits)", (1,0,0,1,0,0), {(2,3): 2, (2,1): 3, (5,4): 1, (5,2): 1}), {(0, 1), (3, 1), (2,2), (2, 4), (2, 5), (5,3), (5,5)}],
+        [("Black Reversed (6 Suits)", (1,0,0,1,0,6), {(2,3): 2, (2,1): 3, (4,5): 1, (5,2): 1}), {(0, 1), (3, 1), (2,2), (2, 4), (2, 5), (5,1)}],
+        [("Black Reversed (6 Suits)", (1,0,0,1,0,6), {(2,3): 2, (2,1): 3, (5,4): 1, (5,2): 1}), {(0, 1), (3, 1), (2,2), (2, 4), (2, 5), (5,1), (5,3)}],
+    ]
+    run_simple_test(variants.get_trash, tests)
+
+
+if __name__ == '__main__':
     test_get_available_rank_clues()
     test_get_available_color_clues()
     test_get_all_touched_cards()
-    test_is_brownish_pinkish()
-    test_is_whiteish_rainbowy()
-    t1 = dt.datetime.now()
-    print(f"All tests passed in {(t1 - t0).total_seconds():.2f}s!")
-
-
-if __name__ == "__main__":
-    test_all()
+    test_is_brownish()
+    test_is_pinkish()
+    test_is_whiteish()
+    test_is_rainbowy()
+    test_max_num_cards()
+    test_playables()
+    test_trash()

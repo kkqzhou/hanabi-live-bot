@@ -1,6 +1,6 @@
 from html.parser import HTMLParser
 import requests
-from game_state import SUITS, DARK_SUIT_NAMES
+from variants import SUITS, DARK_SUIT_NAMES
 
 
 class Parser(HTMLParser):
@@ -82,14 +82,18 @@ if __name__ == "__main__":
         "Cow",
         "Synesthesia",
     ]
-    include_substrings = ["Dark Null"]
+    exclude_substrings += [
+        "Brown", "Omni", "Null", "Odds and Evens", "Funnels", "Chimneys", "Light Pink", "Critical Fours",
+        "Pink-Fives", "Ambiguous", "Pink-Ones", "Pink-Fives", "Muddy-Rainbow-Fives"
+    ]
+    include_substrings = None
 
     vars = set(
         get_missing_vars(
-            "yagami_blue",
-            5,
-            include_dark_suits=True,
-            num_suits=6,
+            "yagami_black",
+            3,
+            include_dark_suits=False,
+            num_suits=5,
             include_substrings=include_substrings,
             exclude_substrings=exclude_substrings,
             shorthand=True,
