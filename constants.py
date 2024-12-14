@@ -33,3 +33,5 @@ RANK_CLUE.set_str("RANK")
 
 CardTuple = Tuple[int, int]
 ClueTuple = Tuple[TextInt, int]
+P = ACTION.PLAY
+D = ACTION.DISCARD

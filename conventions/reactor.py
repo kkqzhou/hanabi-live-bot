@@ -1,148 +1,248 @@
-from game_state import (
-    GameState, RANK_CLUE, COLOR_CLUE, Card,
-    get_available_color_clues, get_available_rank_clues
-)
+from card import Card, RichCard
+from constants import CardTuple, RANK_CLUE, COLOR_CLUE, P, D
+from conventions.ref_sieve import get_effective_stacks
+from game_state import GameState, ActionableCard
+from hand import Hand, horizontal_concat
+from variants import get_available_color_clues, get_available_rank_clues, get_playables, get_next_playable_card, get_trash
+
 from typing import Dict, List, Tuple, Optional, Set
-from dataclasses import dataclass
 from copy import deepcopy
-from enum import Enum
 
 
-def get_reactive_playable_human_slot(
-    target_hand: List[Card],
-    candidates_list: List[Set[Tuple[int, int]]],
-    playables: Set[Tuple[int, int]],
+def find_cathy_playable_slot(
+    cathy_hand: Hand,
+    stacks: List[int],
     play_orders: List[int],
-) -> Optional[int]:
-    """Human slot means newest = 1, instead of oldest = 0"""
-    leftmost_play = None
-    for i, card in enumerate(target_hand):
-        if card.order in play_orders:
+) -> Tuple[int, RichCard]:
+    effective_stacks = get_effective_stacks(cathy_hand, stacks, play_orders)
+    cathy_card: Optional[RichCard] = None
+    cathy_clued_slots = cathy_hand.get_clued_slots()
+    clued_tuples: Set[CardTuple] = {cathy_hand(slot).to_tuple() for slot in cathy_clued_slots}
+    cathy_playables = get_playables(cathy_hand.variant_name, effective_stacks)
+    playables = get_playables(cathy_hand.variant_name, stacks)
+
+    # now we don't have to use play orders since they will be trash wrt effective rank
+    for cathy_slot in cathy_hand.get_all_slots():
+        rich_card = cathy_hand(cathy_slot)
+        tup = rich_card.to_tuple()
+        if rich_card.card.order in play_orders:
             continue
-        
-        candidates = candidates_list[i]
+
+        # TODO: handle obviously playable
         # TODO: this is a bug that will need to be fixed eventually, but need to use filtration instead of candidates
-        if not len(candidates.difference(playables)) and len(candidates):
-            continue
+        obviously_playable = len(rich_card.empathy.candidates.difference(playables)) == 0
+        if tup in cathy_playables and (tup not in clued_tuples or cathy_slot in cathy_clued_slots) and not obviously_playable:
+            cathy_card = rich_card
+            break
+    
+    if cathy_card is None:
+        cathy_slot = -1
+    return cathy_slot, cathy_card
 
-        # TODO: if an unclued playable card is also clued in the same hand, the clued copy takes priority
-        if card.to_tuple() in playables:
-            leftmost_play = len(target_hand) - i
-    return leftmost_play
+
+def get_2p0d_normal(
+    bob_hand: Hand,
+    cathy_hand: Hand,
+    stacks: List[int],
+    play_orders: List[int],
+    is_reverse_reactive: bool
+) -> Dict[int, Tuple[ActionableCard, ActionableCard]]:
+    # TODO: maybe need to handle an edge case where the playable coincides with a discard order
+    cathy_play_tuples = {c.card.to_tuple() for c in cathy_hand if c.card.order in play_orders}
+    bob_stacks = get_effective_stacks(cathy_hand, stacks, play_orders[:1] if is_reverse_reactive else [])
+    bob_playables = get_playables(cathy_hand.variant_name, bob_stacks)
+    cathy_slot, cathy_card = find_cathy_playable_slot(cathy_hand, stacks, play_orders)
+        
+    if cathy_card is None:
+        return {}
+
+    result = {}
+    for sum_of_slots in cathy_hand.get_all_slots():
+        bob_slot = ((sum_of_slots - cathy_slot - 1) % len(cathy_hand)) + 1
+        bob_card = bob_hand(bob_slot)
+        tup = bob_card.to_tuple()
+        if tup in bob_playables and tup != cathy_card.to_tuple() and tup not in cathy_play_tuples:
+            result[sum_of_slots] = (
+                ActionableCard(bob_card, P), ActionableCard(cathy_card, P)
+            )
+    return result
 
 
-def get_reactive_trash_human_slot(
-    target_hand: List[Card],
-    candidates_list: List[Set[Tuple[int, int]]],
-    trash: Set[Tuple[int, int]],
-    clued_orders: List[int],
+def get_2p0d_finesse(
+    bob_hand: Hand,
+    cathy_hand: Hand,
+    stacks: List[int],
+    play_orders: List[int],
+    is_reverse_reactive: bool
+) -> Dict[int, Tuple[ActionableCard, ActionableCard]]:
+
+    bob_stacks = get_effective_stacks(cathy_hand, stacks, play_orders[:1] if is_reverse_reactive else [])
+    one_aways = get_playables(cathy_hand.variant_name, bob_stacks, distance=2)
+    bob_finesse_order = bob_hand.get_all_slots()
+    # 1 5 4 3 2
+    bob_finesse_order = [bob_finesse_order[0]] + list(reversed(bob_finesse_order[1:]))
+    result = {}
+    for sum_of_slots in cathy_hand.get_all_slots():
+        for bob_slot in bob_finesse_order:
+            cathy_slot = (sum_of_slots - bob_slot - 1) % len(cathy_hand) + 1
+            suit_index, rank = cathy_hand(cathy_slot).to_tuple()
+            if (suit_index, rank) not in one_aways:
+                continue
+        
+            connecting_card = get_next_playable_card(
+                cathy_hand.variant_name, suit_index, bob_stacks[suit_index]
+            )
+            if connecting_card not in bob_hand(bob_slot).empathy.candidates:
+                continue
+
+            if bob_hand(bob_slot).to_tuple() == connecting_card:
+                result[sum_of_slots] = (
+                    ActionableCard(bob_hand(bob_slot), P),
+                    ActionableCard(cathy_hand(cathy_slot), P)
+                )
+            break
+    return result
+
+
+def find_cathy_trash_slot(
+    cathy_hand: Hand,
+    stacks: List[int],
+    play_orders: List[int],
     discard_orders: List[int],
-) -> Optional[int]:
-    """Human slot means newest = 1, instead of oldest = 0"""
-    leftmost_trash = None
-    already_clued_cards_in_hand = set()
-    for i, card in enumerate(target_hand):
+) -> Tuple[int, RichCard]:
+    effective_stacks = get_effective_stacks(cathy_hand, stacks, play_orders)
+    cathy_clued_slots = cathy_hand.get_clued_slots()
+    clued_tuples: Set[CardTuple] = {cathy_hand(slot).to_tuple() for slot in cathy_clued_slots}
+    trash = get_trash(cathy_hand.variant_name, effective_stacks)
+
+    already_seen = {}
+    first_trash_slot = 2147483647
+    for cathy_slot in cathy_hand.get_all_slots():
         # first iterate over clued cards
-        if card.order not in clued_orders:
+        if cathy_slot not in cathy_clued_slots:
+            continue
+
+        cathy_card = cathy_hand(cathy_slot)
+        if cathy_card.card.order in discard_orders:
+            continue
+
+        # TODO: filtrations should be passed in instead of candidates
+        obviously_trash = len(cathy_card.empathy.candidates.difference(trash)) == 0
+        if obviously_trash:
             continue
         
-        already_clued_cards_in_hand.add(card.to_tuple())
-        candidates = candidates_list[i]
-        # keep in mind that filtrations should be passed in instead of candidates themselves
-        if not len(candidates.difference(trash)) and len(candidates):
+        tup = cathy_card.to_tuple()
+        if tup in trash:
+            first_trash_slot = min(first_trash_slot, cathy_slot)
+        
+        if tup in already_seen:
+            first_trash_slot = min(first_trash_slot, already_seen[tup])
+        else:
+            already_seen[tup] = cathy_slot
+
+    if first_trash_slot < 2147483647:
+        return (first_trash_slot, cathy_hand(first_trash_slot))
+
+    already_seen = {}
+    first_trash_slot = 2147483647
+    for cathy_slot in cathy_hand.get_all_slots():
+        # next iterate over unclued cards
+        if cathy_slot in cathy_clued_slots:
             continue
         
-        if card.to_tuple() in trash:
-            leftmost_trash = len(target_hand) - i
-
-    if leftmost_trash is not None:
-        return leftmost_trash
-
-    already_seen = set()
-    for i, card in enumerate(target_hand):
-        # then iterate over unclued cards
-        if card.order in clued_orders or card.order in discard_orders:
+        cathy_card = cathy_hand(cathy_slot)
+        if cathy_card.card.order in discard_orders:
             continue
         
-        candidates = candidates_list[i]
-        if not len(candidates.difference(trash)) and len(candidates):
-            # globally known trash is skipped over
-            continue
+        tup = cathy_card.to_tuple()
+        if tup in trash or tup in clued_tuples:
+            first_trash_slot = min(first_trash_slot, cathy_slot)
 
-        if card.to_tuple() in trash or card.to_tuple() in already_clued_cards_in_hand or card.to_tuple() in already_seen:
-            leftmost_trash = len(target_hand) - i
+        if tup in already_seen:
+            first_trash_slot = min(first_trash_slot, already_seen[tup])
+        else:
+            already_seen[tup] = cathy_slot
+    
+    if first_trash_slot < 2147483647:
+        return (first_trash_slot, cathy_hand(first_trash_slot))
+    return (-1, None)
 
-        # use this to keep track of same hand dupes
-        already_seen.add(card.to_tuple())
 
-    return leftmost_trash
+def get_1p1d(
+    bob_hand: Hand,
+    cathy_hand: Hand,
+    stacks: List[int],
+    play_orders: List[int],
+    discard_orders: List[int],
+    is_reverse_reactive: bool
+) -> Dict[int, Tuple[ActionableCard, ActionableCard]]:
+    cathy_slot, cathy_card = find_cathy_playable_slot(cathy_hand, stacks, play_orders)
+
+    result = {}
+    if cathy_card is not None:
+        for sum_of_slots in cathy_hand.get_all_slots():
+            bob_slot = ((sum_of_slots - cathy_slot - 1) % len(cathy_hand)) + 1
+            bob_card = bob_hand(bob_slot)
+            result[sum_of_slots] = (
+                ActionableCard(bob_card, D), ActionableCard(cathy_card, P)
+            )
+    else:
+        cathy_slot, cathy_card = find_cathy_trash_slot(cathy_hand, stacks, play_orders, discard_orders)
+        bob_stacks = get_effective_stacks(cathy_hand, stacks, play_orders[:1] if is_reverse_reactive else [])
+        bob_playables = get_playables(cathy_hand.variant_name, bob_stacks)
+        cathy_play_tuples = {c.card.to_tuple() for c in cathy_hand if c.card.order in play_orders}
+        for sum_of_slots in cathy_hand.get_all_slots():
+            bob_slot = ((sum_of_slots - cathy_slot - 1) % len(cathy_hand)) + 1
+            bob_card = bob_hand(bob_slot)
+            tup = bob_card.to_tuple()
+            if tup in bob_playables and tup not in cathy_play_tuples:
+                result[sum_of_slots] = (
+                    ActionableCard(bob_card, P), ActionableCard(cathy_card, D)
+                )
+
+    return result
 
 
 class UnresolvedReaction:
     def __init__(
         self,
-        target_index: int,
-        play_parity: int,
-        focused_slot: int,
-        ordering: List[int],
-        player_slot_orders: Dict[int, List[int]],
-        current_play_orders: List[int],
-        current_clued_orders: Set[int],
-        current_discard_orders: Set[int],
-        all_base_filtrations: Dict[int, List[Set[Tuple[int, int]]]],
-        target_hand: List[Card],
-        playables: List[Tuple[int, int]],
-        trash: List[Tuple[int, int]]
+        hands: List[Hand],    # hands at the time of clue
+        sum_of_slots: int,
+        is_reverse_reactive: bool,
+        play_orders: Set[int],    # for the receiver only
+        discard_orders: Set[int],    # for the receiver only
+        stacks: List[int],
     ):
-        assert len(ordering) >= 2
-        self.target_index = target_index
-        self.play_parity = play_parity
-        self.focused_slot = focused_slot
-        self.ordering = ordering
-        self.player_slot_orders = player_slot_orders
-        self.current_play_orders = current_play_orders
-        self.current_clued_orders = current_clued_orders
-        self.current_discard_orders = current_discard_orders
-        self.all_base_filtrations = all_base_filtrations
-        self.target_hand = target_hand
-        self.playables = playables
-        self.trash = trash
+        self.hands = hands
+        self.sum_of_slots = sum_of_slots
+        self.is_reverse_reactive = is_reverse_reactive
+        self.play_orders = play_orders
+        self.discard_orders = discard_orders
+        self.stacks = stacks[:]
 
     def __str__(self) -> str:
-        return f"[{self.play_parity} {self.focused_slot} {self.ordering} {self.player_slot_orders}]"
+        ss = self.sum_of_slots
+        irr = self.is_reverse_reactive
+        hands_str = horizontal_concat([str(x) for x in self.hands])
+        return f"Sum of slots = {ss}, is_reverse_reactive = {irr}\n{hands_str}\n"
 
     def __repr__(self) -> str:
         return self.__str__()
-    
-    def is_playable(self, candidates: Set[Tuple[int, int]]) -> bool:
-        return not len(candidates.difference(self.playables)) and len(candidates)
-
-    def is_playable_card(self, card: Card) -> bool:
-        return (card.suit_index, card.rank) in self.playables
-    
-    def get_reactive_playable_human_slot(self):
-        return get_reactive_playable_human_slot(self.target_hand, self.all_base_filtrations[self.target_index], self.playables, self.current_play_orders)
-
-    def get_reactive_trash_human_slot(self):
-        return get_reactive_trash_human_slot(self.target_hand, self.all_base_filtrations[self.target_index], self.trash, self.current_clued_orders, self.current_discard_orders)
 
 
 class ReactorGameState(GameState):
     def __init__(self, variant_name, player_names, our_player_index):
         super().__init__(variant_name, player_names, our_player_index)
-        self.discard_orders: Dict[int, List[int]] = {
-            i: []
-            for i in range(self.num_players)
-        }
-        self.play_orders: Dict[int, List[int]] = {
-            i: []
-            for i in range(self.num_players)
-        }
-        self.ctd_order: Dict[int, Optional[int]] = {
-            i: None
-            for i in range(self.num_players)
-        }
-        self.unresolved_reactions: Dict[int, Optional[UnresolvedReaction]] = {
+        self.discard_orders: List[List[int]] = [
+            [] for _ in range(self.num_players)
+        ]
+        self.play_orders: List[List[int]] = [
+            [] for _ in range(self.num_players)
+        ]
+        self.ctd_order: List[Optional[int]] = [
+            None for _ in range(self.num_players)
+        ]
+        self.unresolved_reactions: List[Optional[UnresolvedReaction]] = {
             i: None
             for i in range(self.num_players)
         }
@@ -205,7 +305,7 @@ class ReactorGameState(GameState):
     def is_locked(self, player_index: int) -> bool:
         return self.locked[player_index] or (self.pace < self.num_players) or ((self.clue_tokens == 8) and (self.turn > 0))
     
-    def get_reactive_player_index_ordering(self, player_index: Optional[int] = None) -> List[int]:
+    def get_reacters(self, player_index: Optional[int] = None) -> List[int]:
         """This can be empty if everyone has safe plays."""
         first_reacter = None
         pindex = player_index if player_index is not None else self.our_player_index
@@ -225,21 +325,6 @@ class ReactorGameState(GameState):
             if _player_index != pindex:
                 ordering.append(_player_index)
         return ordering
-
-    def every_good_card_of_rank_is_playable(self, rank: int) -> bool:
-        touched_card_tuples = self.get_touched_card_tuples(RANK_CLUE, rank)
-        at_least_one_card_playable = False
-        for (si, r) in touched_card_tuples:
-            if r != rank:
-                continue
-            if (si, r) not in self.playables and (si, r) not in self.trash:
-                return False
-            if (si, r) in self.playables:
-                at_least_one_card_playable = True
-        return at_least_one_card_playable
-    
-    def every_card_of_rank_is_trash(self, rank: int) -> bool:
-        return all([x >= rank for x in self.stacks])
     
     def is_known_trash_after_clue(self, order: int, clue_type: int, clue_value: int) -> bool:
         player_index, i = self.order_to_index[order]
@@ -282,8 +367,8 @@ class ReactorGameState(GameState):
         card_orders,
     ):
         # TODO: handle locked
-        ordering = self.get_reactive_player_index_ordering(clue_giver)
-        if not len(ordering) or ordering[0] == target_index:
+        reacters = self.get_reacters(clue_giver)
+        if not len(reacters) or reacters[0] == target_index:
             return self.handle_stable_clue(clue_giver, target_index, clue_type, clue_value, card_orders)
         else:
             return self.handle_reactive_clue(clue_giver, target_index, clue_type, clue_value, card_orders)

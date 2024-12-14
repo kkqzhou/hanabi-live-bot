@@ -1,16 +1,199 @@
-from game_state import (
-    GameState, get_all_touched_cards, RANK_CLUE, COLOR_CLUE, Card,
-    get_available_color_clues, get_available_rank_clues
-)
+from card import Card, RichCard
+from constants import RANK_CLUE, COLOR_CLUE, TextInt, P, D, CardTuple
+from game_state import GameState, ActionableCard
+from hand import Hand
+
 from typing import Dict, List, Tuple, Optional, Set
-from dataclasses import dataclass
 from copy import deepcopy
-from enum import Enum
+from variants import get_playables, get_trash, get_all_touched_cards, is_playable, is_trash
 
-# WIPWIPWIP
 
-class BadRefSieveClue(Exception):
-    pass
+def get_effective_stacks(
+    hand: Hand,
+    stacks: List[int],
+    play_orders: List[int],
+) -> List[int]:
+    effective_stacks = stacks[:]
+    for rich_card in hand.rich_cards:
+        if rich_card.card.order in play_orders:
+            si, rank = rich_card.to_tuple()
+            effective_stacks[si] = max(effective_stacks[si], rank)
+    return effective_stacks
+
+
+def is_direct_rank_playable(variant_name, rank: int, stacks: List[int]) -> bool:
+    rank_tuples = {(si, rank) for si in range(len(stacks))}
+    playables = get_playables(variant_name, stacks)
+    trash = get_trash(variant_name, stacks)
+    has_playables = len(rank_tuples.intersection(playables)) > 0
+    return has_playables and not len(rank_tuples.difference(playables.union(trash)))
+
+
+def is_direct_rank_trash(variant_name, rank: int, stacks: List[int]) -> bool:
+    rank_tuples = {(si, rank) for si in range(len(stacks))}
+    trash = get_trash(variant_name, stacks)
+    return not len(rank_tuples.difference(trash))
+
+
+def get_direct_play_clues(
+    hand: Hand,
+    stacks: List[int],
+    discard_orders: List[int],
+) -> Dict[Tuple[TextInt, int], List[ActionableCard]]:
+    # should promise that leftmost then right to left are all playable
+    result = {}
+    for rank in range(1, 6):
+        if not is_direct_rank_playable(hand.variant_name, rank, stacks):
+            continue
+        playables = {x for x in get_playables(hand.variant_name, stacks) if x[1] == rank}
+        touched_slots = hand.get_touched_slots(RANK_CLUE, rank)
+        is_good_clue = True
+        cards_to_play: List[RichCard] = []
+        for i in range(len(touched_slots)):
+            rich_card = hand(touched_slots[-i])
+            if rich_card.is_clued or rich_card.card.order in discard_orders:
+                continue
+
+            if not rich_card.to_tuple() in playables:
+                is_good_clue = False
+                break
+
+            cards_to_play.append(rich_card)
+            if len(cards_to_play) == len(playables):
+                break
+            
+        if is_good_clue:
+            result[(RANK_CLUE, rank)] = [ActionableCard(card, P) for card in cards_to_play]
+    
+    return result
+
+
+def get_ref_play_clues(
+    hand: Hand,
+    stacks: List[int],
+    play_orders: List[int],
+) -> Dict[Tuple[TextInt, int], ActionableCard]:
+    result = {}
+    effective_stacks = get_effective_stacks(hand, stacks, play_orders)
+    playables = get_playables(hand.variant_name, effective_stacks)
+    for color in hand.get_legal_color_clues():
+        # indices: 4 3 2 1 0
+        touched_idxs = hand.get_touched_indices(COLOR_CLUE, color)
+        focus = max((x + 1) % hand.size for x in touched_idxs)
+        if hand[focus].to_tuple() in playables:
+            result[(COLOR_CLUE, color)] = ActionableCard(hand[focus], P)
+    
+    for rank in hand.get_legal_rank_clues():
+        # trash push
+        if not is_direct_rank_trash(hand.variant_name, rank, stacks):
+            continue
+
+    return result
+
+
+def get_ref_discard_clues(
+    hand: Hand,
+    stacks: List[int],
+    discard_orders: List[int],
+) -> Dict[Tuple[TextInt, int], List[ActionableCard]]:
+    result = {}
+    direct_play_clues = get_direct_play_clues(hand, stacks, discard_orders)
+    for rank in hand.get_legal_rank_clues():
+        if (RANK_CLUE, rank) in direct_play_clues:
+            continue
+        if is_direct_rank_trash(hand.variant_name, rank, stacks):
+            continue
+        newly_touched = set(hand.get_newly_touched_indices(RANK_CLUE, rank))
+        if not len(newly_touched):
+            continue
+        
+        leftmost_new_idx = max(newly_touched)
+        called_to_discard: Optional[RichCard] = None
+        for idx in sorted(hand.get_unclued_indices(), reverse=True):
+            if idx not in newly_touched and idx < leftmost_new_idx:
+                called_to_discard = hand[idx]
+                break
+        if called_to_discard is not None:
+            result[(RANK_CLUE, rank)] = ActionableCard(called_to_discard, D)
+        
+    return result
+
+
+def get_chop_index(hand: Hand) -> Optional[int]:
+    unclued_idxs = hand.get_unclued_indices()
+    if not len(unclued_idxs):
+        return None
+    return max(unclued_idxs)
+
+
+def get_safe_action_clues(
+    hand: Hand,
+    stacks: List[int],
+    is_locked: bool
+) -> Dict[Tuple[TextInt, int], List[ActionableCard]]:
+    clued_idxs = set(hand.get_clued_indices())
+    if not len(clued_idxs):
+        return {}
+    
+    for idx in clued_idxs:
+        if hand[idx].empathy.is_playable(stacks):
+            return {}
+        if hand[idx].empathy.is_trash(stacks):
+            return {}
+
+    chop_index = get_chop_index(hand)
+    playables = get_playables(hand.variant_name, stacks)
+    trash = get_trash(hand.variant_name, stacks)
+    if is_locked or chop_index is None:
+        chop_is_good = True
+    else:
+        chop_card = hand[chop_index]
+        chop_is_good = chop_card.to_tuple() not in trash
+    
+    result = {}
+    for clue_type, clue_value in hand.get_legal_clues():
+        touched = set(hand.get_touched_indices(clue_type, clue_value))
+        clued_touch_idxs = touched.intersection(clued_idxs)
+        unclued_touch_idxs = touched.difference(clued_idxs)
+        if not len(clued_touch_idxs):
+            continue
+        
+        num_of_new_good_cards = 0
+        for idx in unclued_touch_idxs:
+            if hand[idx].to_tuple() not in trash:
+                num_of_new_good_cards += 1
+
+        if chop_is_good:
+            if num_of_new_good_cards < min(len(unclued_touch_idxs), 1):
+                continue
+        else:
+            if num_of_new_good_cards < len(unclued_touch_idxs):
+                continue
+        
+        actionables = []
+        exact_card_tuples: Dict[CardTuple, List[RichCard]] = {}
+        for idx in clued_touch_idxs:
+            _, new_inferences = hand[idx].handle_clue(clue_type, clue_value, True, commit=False)
+            if is_playable(new_inferences, hand.variant_name, stacks):
+                actionables.append(ActionableCard(hand[idx], P))
+            elif is_trash(new_inferences, hand.variant_name, stacks):
+                actionables.append(ActionableCard(hand[idx], D))
+            
+            if len(new_inferences) == 1:
+                new_inference = next(iter(new_inferences))
+                if new_inference not in exact_card_tuples:
+                    exact_card_tuples[new_inference] = []
+                exact_card_tuples[new_inference].append(hand[idx])
+        
+        for _, revealed in exact_card_tuples.items():
+            if len(revealed) >= 2:
+                for card in revealed:
+                    actionables.append(ActionableCard(card, D))
+            
+        if len(actionables):
+            result[(clue_type, clue_value)] = actionables
+
+    return result
 
 
 class RefSieveGameState(GameState):
@@ -73,21 +256,6 @@ class RefSieveGameState(GameState):
     def is_weak_trash_card(self, card: Card) -> bool:
         return card.to_tuple() in self.weak_trash
 
-    def every_good_card_of_rank_is_playable(self, rank: int) -> bool:
-        all_touched_cards = get_all_touched_cards(RANK_CLUE, rank, self.variant_name)
-        at_least_one_card_playable = False
-        for (si, r) in all_touched_cards:
-            if r != rank:
-                continue
-            if (si, r) not in self.playables and (si, r) not in self.trash:
-                return False
-            if (si, r) in self.playables:
-                at_least_one_card_playable = True
-        return at_least_one_card_playable
-    
-    def every_card_of_rank_is_trash(self, rank: int) -> bool:
-        return all([x >= rank for x in self.stacks])
-    
     def is_known_trash_after_clue(self, order: int, clue_type: int, clue_value: int) -> bool:
         player_index, i = self.order_to_index[order]
         if player_index == self.our_player_index:

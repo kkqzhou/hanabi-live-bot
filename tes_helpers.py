@@ -1,8 +1,8 @@
 from card import Card
 from constants import CardTuple, COLOR_CLUE, RANK_CLUE
 from deck import get_random_deck
-from game_state import GameState
-from typing import Any, Callable, Dict, List, Optional, Set, Union, Tuple
+from game_state import GameState, ActionableCard
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Union, Tuple
 from variants import get_all_touched_cards
 
 import json
@@ -206,3 +206,7 @@ def get_game_state_from_replay(id_, turn, game_state_cls: GameState):
             raise NotImplementedError(x["type"])
 
     return states
+
+
+def unwrap(result: Dict[Any, Union[ActionableCard, Iterable[ActionableCard]]]):
+    return {x: (y.to_tuple() if isinstance(y, ActionableCard) else tuple([z.to_tuple() for z in y])) for x, y in result.items()}

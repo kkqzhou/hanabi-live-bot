@@ -179,7 +179,7 @@ def get_all_cards_with_multiplicity(variant_name: str) -> List[CardTuple]:
     return cards
 
 
-def get_card_counts(variant_name: str) -> Dict[CardTuple, int]:
+def get_card_counts(variant_name: str) -> Counter[CardTuple]:
     return Counter(get_all_cards_with_multiplicity(variant_name))
 
 
@@ -499,20 +499,35 @@ def is_rainbowy(variant_name: str) -> bool:
     return False
 
 
+def get_next_playable_card(variant_name: str, suit_index: int, stack: int, distance: int = 1) -> CardTuple:
+    if "Reversed" in SUITS[variant_name][suit_index]:
+        return (suit_index, stack - distance)
+    else:
+        return (suit_index, stack + distance)
+
+
 def get_playables(
     variant_name: str, stacks: List[int], distance: int = 1
  ) -> Set[CardTuple]:
     assert len(stacks) == len(SUITS[variant_name])
     playables = set()
     for si, stack in enumerate(stacks):
-        if "Reversed" in SUITS[variant_name][si]:
-            playables.add((si, stack - distance))
-        else:
-            playables.add((si, stack + distance))
+        playables.add(get_next_playable_card(variant_name, si, stack, distance))
     return playables
 
 
-def get_trash(variant_name: str, stacks: List[int], discards: Optional[Dict[CardTuple, int]] = None) -> Set[CardTuple]:
+def is_playable(card_tuples: Set[CardTuple], variant_name: str, stacks: List[int]):
+    return not len(card_tuples.difference(get_playables(variant_name, stacks)))
+
+
+def has_already_been_played(variant_name, stacks: List[int], suit_index: int, rank: int) -> bool:
+    if "Reversed" in SUITS[variant_name][suit_index]:
+        return stacks[suit_index] <= rank
+    else:
+        return stacks[suit_index] >= rank
+
+
+def get_trash(variant_name: str, stacks: List[int], discards: Optional[Counter[CardTuple]] = None) -> Set[CardTuple]:
     if discards is None:
         discards = {}
     trash_cards = set()
@@ -544,3 +559,7 @@ def get_trash(variant_name: str, stacks: List[int], discards: Optional[Dict[Card
             dead_trash = dead_trash.union({(si, x) for x in range(dead_rank, 6)})
 
     return trash_cards.union(dead_trash.difference(dead_cards))
+
+
+def is_trash(card_tuples: Set[CardTuple], variant_name: str, stacks: List[int]):
+    return not len(card_tuples.difference(get_trash(variant_name, stacks)))
